@@ -1,0 +1,441 @@
+Kode Kloud solution Architect notes:
+
+VPC: (Virtual Private Cloud)
+It is a secured,isolated network segment hosted within AWS.
+They allow us to isolate resources from other resources in the cloud. (If we dont want applications to talk to each other)
+With VPCs, we get access to subneting (IP Address),Routing (Route tables),Firewalls (NACLS and Security Groups) & Gateways.
+VPCs are specific to a single region. (eg: vpc1 in us-east-1 region and vpc2 in us-east-2 region)
+VPC acts as network boundary. And resources created in these vpc are completly isolated. It is also a kind of security. And if we want connection between them, we need to explicitly allow it.
+
+Every VPC has a range of IP addresses assigned to it called CIDR block.
+A CIDR block defines the IP addresses that resources in the VPC can use.
+(Eg. If we have the server deployed in VPC-1, it can only get IP address within that CIDR block)
+
+A CIDR block size can be anywhere from a /16 to a /28 .
+Assume we create a VPC-1 and it has a CIDR block of 192.168.0.0/16. This means the IP addresses from 192.168.0.0 to 192.168.255.255 are avilable for our resources deployed in VPC-1.
+We can also enable optional secondary IPv4 Block. and Optional IPv6 /56 CIDR Block. And can have upto 5 IPv6 CIDR blocks, but this limit is adjustable.
+
+There are 2 types of VPCs:
+1.Default VPC 
+2.Custom VPC
+
+Default VPC is automatically created by AWS in all the region by default. the services deployed in it can automatically access internet.
+They always have /16 IPv4 CIDR block 172.31.0.0/16 (65,536 addresses). This is common for all regions and all accounts. We get 1 default subnet (/20) in each Availability Zone (4096 addresses). (Eg. 172.31.16.0/20 in AZ1 and 172.31.32.0/20 in AZ2).
+By defaultly Internet gateway attached to the VPC. A route that points all traffic (0.0.0.0/0) to the internet gateway. Devices in these default subnets will be accessible from the internet. Default security group (allowing outbound traffic by default) and Default Nacl (allows both inbound and outbound traffic).
+The Default VPC and its subnets have outbound access to the internet by default.
+
+In custom VPC, We need to do all the settings in it.
+-----------------------------------
+Demo: Custom VPC
+
+Goto AWS,select region and go to VPC. We can see default VPC here. Create vpc button
+Choose option VPC only (or vpc and more).
+demo-vpc --> Ipv4 CIDR block : 10.0.0.0/16 --> no IPv6 CIDR block --> add tags --> create vpc . We can see all the details of our VPC now. We can also see "Resource map" tab for it gives complete information about our VPC.
+Select the VPC and click on delete.
+------------------------------------
+Demo: Default VPC
+
+Go to VPC and click on the default VPC to see more information of it.
+Go to subnets tab and we can see 6 default subnets in us-east-1 (N.Virginia) region. This is because we have 6 AZ in this region. Now we can go to resource map tab and visualize it. we can also see 1 default route table and 1 igw (provides internet connection to the resources attached to it) 
+Since we have igw associated with this VPC, the "Auto-assign public IPv4 address" option is set to 'Yes'. This means when we deploy a server in this VPC, its going to automatically get public address and we will be automatically able to connect to it.
+You can test this by launching EC2 instance in default subnet.
+---------------------------------
+Subnets:
+
+Subnets are groups of IP addresses in your VPC.
+A subnets resides within a single Availability Zone.
+Subnets can be made public or private to allow external access to resources within them. 
+Subnets within a VPC must be within the CIDR range. (if our VPC CIDR is 192.168.0.0/16, then subnet of 192.168.10.0/24 is valid but 10.100.1.0/24 is invalid as it is not within the VPC CIDR range.)
+A subnet block size must be between a /16 and a /28 .
+The first 4 IP addresses of a subnet are reserved and cannot be used.
+i.e 192.168.10.0 (Network address), 192.168.10.1 (VPC Router), 192.168.10.2 (DNS), 192.168.10.3 (for Future Use), and last IP address for subnt (192.168.10.255) is reserved for broadcast address.
+
+Subnet configuration options:
+* Subnets cannot overlap with other subnets in the VPC 
+Eg:
+Subnet A: 10.16.0.0/24 and Subnet B: 10.16.0.128/25 in the same vpc is invalid
+Overlapping IP Address Ranges,
+Subnet A: 10.16.0.0 to 10.16.0.255
+Subnet B: 10.16.0.128 to 10.16.0.255
+
+* A subnet allows for an optional IPv6 CIDR.
+* A subnet can be configured to be IPv6 only - No IPv4 addresses
+* Subnets can communicate with other subnets in the VPC
+* Auto-assign public IPv4/IPv6 address in addition to the private address.
+--------------------------------------
+Demo: Subnets
+
+Create a new custom VPC with CIDR 10.0.0.0/16 with Amazon provided ipv6 CIDR block.
+Go to subnets --> select VPC --> subnet-1 --> AZ: us-east-1d --> IPV4 CIDR block: 10.0.1.0/24  --> IPc6 CIDR block : 2600:1f18:24e0:de00::/56 --> create subnets.
+Similarly create one more subnet 10.0.5.0/24 in us-east-1a region. 
+Now if we want to deploy our server in subnet-1, then the server will be deployed in us-east-1d. 
+Now we can test this by creating an instance in this subnet. Now we can see that the instance private ip is 10.0.5.113 which is within the subnet we specified.
+Now delete the instance and delete the VPC (This will automatically delete the subnets in it).
+-------------------------------------
+Routing in VPC:
+
+Every VPC has a VPC router. And this router can be accessible from a network and 1 address of each subnet. Purpose of router is to route traffic between subnets and also in and out of vpc. 
+A route table is set of rules that the router uses to forward network traffic.   
+Each rule in the route table is referred to as 'route'.
+All route tables have one route by default i.e local route.
+The router has an interface in every subnet of VPC and is reachable from the network + 1 address of each subnet. 
+Every subnet is associated with route table. We can specify the route table with which the subnet is associated with. 
+Suppose we have subnet in AZ1, then any traffic leaving this subnet will follow the rules in the route table and decide where the package should be sent.
+When we create vpc, it will automatically create default route table for us. and the new subnets created will automatically going to get associated with this route table untill we point it to different route table.
+Multiple subnets can be asociated with single route table. But a subnet can be associated with only one route table at a time. (IMP)
+---------------------------------------
+Demo: Route table
+
+Create a vpc and 2 subnets. Now we can see our subnets are automatically assigned to a main route table.click on the route table.
+Now we can see in the subnet association, there is no explicit subnet association and there we can see only subnet without explicit association.
+Create our own route table. create routr table --> name--> choose vpc --> create
+Now click on edit subnet association and choose the subnet-1 .
+Now this means that any traffic that comes from subnet1 will follow the rules associated with route table 1 (rt1). We can se it in the routes tab. Similarly create one more rt2 and associate subnet 2 with it.
+Now click on routes tab and edit route ,add route 0.0.0.0/0 and choose whatever target u want i.e nat,local,igw etc and save
+Finally delete vpc and it automatically deletes subnets and route table.
+-------------------------------------
+Internet gateway:
+
+When we create a subnet, by default that will be private subnet. i.e devices in this subnet cant talk to internet and vice versa. To make subnets public, we need to attach it to igw. IGW are attached to vpc and they cover all az in that region.
+A vpc can have upto 1 igw attached to it. And internet gateway can only be attached to 1 vpc at a time. 
+First we need to create IGW and attach it to our vpc,then create custom route table, then configure default route pointing to igw.
+When we deploy resources onto public subnet, by default they only get private ip. We need to check box to enable public ip.
+anyone who wants to access our resources, will first send request to public ip and then it is converted and forwarded to private ip which will then go to specific ec2 instance/resource. The resources only know about the private ips. The public ip is associated(linked) with private ip.
+--------------------------------------
+Demo: IGW
+
+Create a Vpc and 1 subnet. Create a ec2 instance and choose this vpc and subnet we created. with security group icmp-ipv4 from 0.0.0.0 . Now when the instance is ready, grab its public ip and try to ping. We can see that it is unable to ping. Even we cannot ssh into it. This is because the subnet we created will be by default private subnet.
+go to vpc and create a igw "my-igw". select it ,actions attach to vpc and select ur vpc and attach. But still we wont be able to access our server. 
+select your subnet and click on route table tab. we can see there is no default route. we only have local route. For this lets create custom route table (we can also change in custom route table also). 
+create route table public-rt --> choose our vpc --> create
+click on subnet association tab, edit it and choose our subnet --> save association
+Next click on routes tab and edit it and add default route i.e destination is 0.0.0.0/0 and target is the igw we created.
+Now we will be able to ssh into our ec2 and ping our server.
+-------------------------------
+Nat Gateways:
+
+Suppose we have server in private subnet and we need to give it internet connectivity to download and update security patches. we could attach IGW to this but the issue with this is now the server is in public subnet.which means it is open to entire world.
+But incase if our servers are meant to be internal server, that only internal team should have access to, we dont want it to be accessed to internet.
+We want our server to initiate connection to internet but there should not be any connection to the server from internet. For this we use NAT gateway. 
+To use NAT gateway,we still need internet gateway. First we attach igw to vpc and then attach the NAT gateway to public subnet. (we can think NAT gateway as server running on public subnet). Next we need to setup routing so that devices in private subnet will have a default route that points to the Nat gateway. So that now instance will send packet to Nat gateway in public subnet and public subnet will send packet to internet. But we can never initiate a connection from internet to server as our server doesnt have public ip. 
+Nat gateway is managed service. In pricing, it will be charged per hour and per GB of data processed.
+Nat gateways are not region specific like internet gateways. 
+When we deploy nat gateway,we deploy it to a subnet i.e it will be specific to az. if we want redundancy, we need to deploy it to multiple AZ for failover.
+Nat gateway uses elastic ips.
+Route table of private subnet should point to nat gateway.
+A NAT gateway supports 5 Gbps of bandwidth and automatically scales upto 100 Gbps.
+--------------------------------
+Demo: Nat gateway
+
+Create VPC,1 pvt subnet, create ec2 instance in that pvt subnet. Now our instance is created without public ip. before creating nat gateway, we need to have igw attached to our vpc as wkt we need to deploy nat gateway in public subnet and our subnet will become public after attaching igw. create my-igw and attach it to our vpc. next create public subnet in same vpc. Create 2 route tables, 1 for public subnet and 1 for pvt subnet. So that private subnet will have default route to nat gateway and public subnet will have default route to the igw. public-rt and private-rt . Edit public-rt and add default route to 0.0.0.0/0 to IGW. subnet association, select public subnet and save.
+Edit private-rt and in subnet association, select private subnet and save.
+click on nat gateway --> create --> my-nat-gateway --> choose your public subnet --> allocate elastic ip --> create.
+go to route tables, select private-rt --> routes --> edit route and add 0.0.0.0/0 and choose ur nat gateway --> save
+For resilience, you can create nat gateway in another az (for back up).
+-----------------------------------
+Private and Public subnets:
+
+To determine whether a subnet must be private or public, we need to decide based on that should devices on internet be able to interact with our resources deployed on the subnet. If yes, then it should be public or else private. 
+Eg. webserver application should be on the public subnet since users on internet needs to interact with the website, the webserver needs to be on a public subnet.
+Suppose we have web application that needs to talk to database, in this case,webserver will be deployed on public subnet and database will be deployed on private subnet as it has sensitive information and only webserver should be able to talk to it.
+
+Private subnet- use case:
+Aws should act as an extension for our private data center, then we can deploy all our resources into a private subnet and use a vpn to connect our private datacenter to connect to aws resources.
+-----------------------------------
+DNS
+
+By default all the private IP addresses assigned to EC2 instance will get a domain name.  
+(eg. 10.0.100.10.ec2.internal)This is only on default private IP addresses. So for any resource that wants to talk to our ec2 instance can either send to ip address or its domain name.
+By default only private ips get dns entry and public once cant. If we want public ip addresses also to get a domain name, we should enable "enableDnsHostnames" options when we create a vpc. 
+enableDnsHostnames option determines whether the VPC supporting assigning public DNS hostnames to instances with public IP addresses.
+enableDnsSupport determines whether the vpc supports DNS resolution through the Amazon provided DNS server.
+AWS DNS server can be accessed on the second IP of the VPC CIDR block as well - 169.254.169.253
+---------------------------------------
+Demo: DNS 
+
+Create a custom VPC. now select that vpc and actions --> edit vpc settings --> Under DNS settings, we can see two options "Enable DNS resolution" and "Enable DNS hostnames".
+now check the box of "Enable DNS resolution" only and save.
+Create a instance in this VPC and enable public ip address and create. Once the instance is created, in details section, we can see ip details. Where in we can see private IP DNS name (ip-10-0-1-144.ec2.internal) but no public IPv4 DNS and this is because we have not checked the box of enable DNS hostnames. And now if we check this box and save, then  
+we can see the DNS for this public ip address(i.e ec2-35-173-226-213.compute-1.amazonaws.com) . Now using this DNS name, anyone can access our instance. It will resolve.
+Next ssh into this instance to check the other option also. run cat /etc/resolve.conf , we can see the nameserver 10.0.0.2 . Now do --> nslookup google.com and we van see that using AWS dns server 10.0.0.2 , it was successfully able to resolve that. This worked because we have enabled the DNS resolution option in vpc. We can disable this and test it. nslookup wont work. This is because it is trying to send the dns request to that ip address 10.0.0.2 and AWS is now configured not to respond to it. 
+------------------------------------
+Elastic IP:
+
+We get a public IP for a instance once we create it. but if we stop an start instance, it will change.
+Elastic IP is a static IPv4 address. We can allocate it to our account and it becomes reserved for our account and then we can associate this eip with our instance. Now if instance is rebooted or moved to another account, the IP remains the same. 
+We can also assign security group to this Elastic IP so that it will be fixed network configuration.
+Suppose we want to do some maintanence on our instance,then we can move this elastic ip on another server which is running the same application.
+Elastic IP pricing: EIP associated with running instance is zero cost. But if we associate another elastic ip with same instance, then we will be charged with Additional IP charged per hour. 
+If we reserve an EIP and dont associate it with instance, it will incur small additional charge a well. 
+EIp are specic to a region and cannot be moved to another region. EIP comes from Amazon's pool of ipv4 addresses and also from our custom ipv4 addresses.
+----------------------------------
+Demo: Elastic IP
+
+create a instance in public subnet. note its public ip, now stop and start it, and we can see ip has changed. Select elastic ip in left side menu --> allocate elastic ip address --> choose region --> amazon pool of ipv4 --> Allocate.
+Select this elastic Ip and actions --> associate elastic ip --> choose your instance --> in case if u have multiple private ips, u can choose that ip also --> associate 
+ping this ip to test. stop the instance and again start it and now we can see it got the same elastic ip address.
+Finally disassociate elastic ip from server and release the elastic ip
+----------------------------------
+Security groups and NACLs
+
+They both act as firewalls. Firewalls monitor traffic and only allow traffic permitted by a set of predefined rules. They have inbound and outbound rules.
+There are two types of firewalls, stateful and stateless.
+stateless firewalls must be configured to allow both inbound & outbound traffic.
+Stateful firewalls are intelligent enough to understand which request and response are part of the same connection. If a request is permitted,the response is automatically permitted as well in a stateful firewall. 
+
+Network Access Control List (NACL):
+NACLs filter traffic entering and leaving a subnet. NACLs do not filter traffic within a subnet. This means two servers within a subnet are allowed to talk to each other. 
+NACLs are stateless firewalls,so rules must be set for both inbound and outbound traffic.
+
+Security Groups:
+Security Groups act as firewalls for individual resource (EC2,LB,RDS). 
+Security groups are stateful,so only the request needs to be allowed. Response is automatically permitted.
+Note:
+* Security groups, when there are no rules,block everything. And when you add a security group rule,it allows a certain type of traffic.
+All security group rules "allow" traffic; there is no "deny" option for security groups.
+* NACL rules can either allow or deny traffic. They have Rule number (70,80,90), smaller the number and earlier it will get processed. It also has Allow/Deny option.
+
+Multiple Security Groups:
+* You can assign multiple security groups to a single resource.
+* The rules for bot sg will get merged.
+
+* By default,sg contain outbound rules that allow all outbound traffic (you can delete this rule)
+* Every subnet within a VPC must be associated with a network with a network ACL
+* You can associate a network ACL with multiple subnets;however,a subnet can only be associated with only one network ACL at a time.
+-------------------------------------
+Demo: Security Groups
+
+We can create one sg and the same sg can be used for other resources like lb also. when we create instance, by default it gives access to only one rule is ssh --> port 22 --> anywhere. once instance is created,delete the sg.
+Create a new security group "webserver-sg" ,choose vpc ,inbound rule allow ssh traffic.
+Now to attach this sg to the instance, select ur instance ,actions --> security --> change sg --> remove the old sg --> choose "webserver-sg" and click add --> save.
+
+ssh into this instance and install a webserver 
+--> sudo yum install nginx
+--> sudo systemctl start nginx
+
+--> curl localhost (o/p: welcome to nginx)
+Now if we grab its public ip and access it in browser, we cant and this is because we need to allow inbound port 80(HTTP) and 443(HTTPS) from anywhere. 
+Even if we delete outbound rule, sg is smart enough to allow traffic outside as it is stateful firewall. but from inside our server, if we do ping 8.8.8.8 ,it wont work. so we need to add outbound rule.
+We can attach the same sg to multiple servers.
+if we want the traffic to come from particular instance to our server, we need to copy that instance pvt ip and paste it in our security group and say allow custom tcp from this ip (OR) we can also add the security group from which we want to allow traffic to this security group. this means "the traffic from any resources which has this sg associated with it is allowed" so by this we dont keep track of IPs of individual resources. 
+------------------------------------
+Demo: NACLs
+
+Go to your ec2 instances and allow all traffic in sg for testing purpose. Identify the subnet for your intances in the networking tab. Go to VPC and choose Network ACLs in the left menu.select that subnet and we can see in the inbound rules, all traffic rule number 100 is Allow. And another rule below it is All traffic Deny. Traffic doesnt hit deny as it is not having rule number. 
+Now edit inbound rules of this subnet and modify rule 100 to allow only ssh from anywhere. by this everything else traffic will hit deny. This is same for another ec2 instance also as they both are in same subnet. but now if we try to access our site in browser, we cant. as we are blocked.
+Next go back to NACL and edit that subnet & allow http (rule no 110) and https (rule no 120) and save. Now we can access our site.
+Next if we try to install nginx in the server-2 , we cant. This is because of NACl it cant reach internet. Even if we have all traffic allowed in the outbound rules,it cant reach the internet. This is bacause NACLs are Stateless.We need to explicitly mention the outbound rules. Now edit inbound rules again and add rule number 130 and allow all traffic. Now our server will be able to access internet. We need to allow rule on both sides for Nacls.  Now ur site "welcome to nginx" will load fine. now we can remove the all traffic from the inbound rules of the Nacls subnet. 
+We can make use of Nacls when we want to filter some traffic .eg. in the same subnet inbound rule, edit it and create rule 90 and deny ssh from 1.0.0.0/24 . so now other then the mentioned ip, all others can do ssh into servers.
+This is a benifit of nacls over sg as they can be configured for both allow and deny whereas security group for only allow.   
+-----------------------------------
+Load Balancers:
+
+Consider we have our app in ec2 intance and user is accessing it. suppose if our instance goes down, then application goes doen and it cant be accessed. to avoid we deploy same application in 3 other servers in different AZ as well. But each of these instances will hae different IPs. What ip address does the user send request to? Instead of letting our user know all ip addresses, we can make use of Load balancers. So now only IP address the user need to know is the ip of load balancer.
+
+Load Balancers in AWS - Types
+1. Classic load balancer
+2. Application load balancer
+3. Network load balancer
+
+Classic load balancer is old generations and has lot of limits. One of the limitations is that we can use only one SSL certificate per classic load balancer. If we have 2 different applications, then we can use only one SSL recommended. hence this lb is not recommended for new application setup.
+
+Application lb works for web based applications and they support HTTP/HTTPS/Web Sockets. And if your application is using some other protocol, you will not be able to use App lb.
+They function at application layer (layer 7).
+They can forward requests based off of: 
+* URL Path conditions,
+* Host domain,
+* HTTP fields - header,method, query, and IP
+* Supports HTTP redirects and customHTTP response
+They Perform application-specific health checks
+
+When the client sends request to ALB using any protocol say SSL/TLS, Http/Https are always terminated on ALB.
+
+             SSL/TLS                               HTTP
+client  --------------------->   ALB   ---------------------------> EC2 instance
+                        SSL certs resides on ALB             (unencrypted)
+                       (Encrypted only upto here)
+
+If you still want the traffic to be encrypted between load balancer and EC2 instance,We can make it by adding SSL cert to our EC2 instance as well.We should manage it ourself.
+
+3. Network loadbalancer(NLB):
+* Load balance traffic based on TCP/UDP (layer 4)  (It doesnt understands HTTP or HTTPS)
+* Meant for applications that don't use HTTP/HTTPS
+* Faster than application load balancers
+* Health checks are only basic ICMP/TCP connections
+* NLB forwards TCP connections to instances. (nothing is terminated here in between)
+
+Since the session is between client and EC2 instances, the traffic is encrypted end to end
+            TCP/UDP                             TCP/UDP
+client ----------------------->   NLB   ---------------------------> Instance
+                       (NLB forward based on UDP/TCP)               (certificate)
+
+They use TLS/SSL for TCP and DTLS for UDP
+
+Network Load Balancer (NLB) can forward HTTP and HTTPS traffic also because these protocols are built on TCP, NLB does not offer features specific to HTTP/HTTPS traffic management, such as SSL/TLS termination or URL-based routing. For applications requiring such features, an Application Load Balancer (ALB) would be a more appropriate choice.
+
+Elastic load balancers work description:
+consider we have a vpc and two AZ inside it and our resources are inside it. When we configure ELB here, it will ask for AZ details and we can define this by specifying the subnets.(there are physical resources that get deployed when we are using the load balancer). So we create a subnet in each of the AZ that we want to load balance traffic to and when we select those subnets, AWS will deploy 'LB node' on each of these subnets. And they are responsible for load balancing traffic. Once they are deployed onto the subnets we specify,we can now load balance traffic to any other subnets or even same subnet within that AZ.
+When the user or the client wants to send traffic to one of the instance, A DNS record is created for the ELB. And that DNS record is equally forwarded among all load balancer nodes. And taht LB nodes will direct load to respective EC2 instances. 
+
+Cross-Zone Load Balancing:
+Consider we have a vpc and two AZ and a ELB and LB node in each AZ. When user sends request to ELB, it will be equally distributed among nodes. And this node will then distribute load among ec2 instance equally (if two instances are there, then 25 % each).
+And all these are in same AZ and the traffic cant go accross AZ. And hence Cross-Zone Load Balancing feature was created. It allows LB nodes to load balance traffic to ec2 instances and resources in different AZs.
+
+Load Balancers - Deployment Modes
+
+Public load balancers:
+* Deployed on public subnets
+* Access by users across the public internet
+
+Private Load Balancers
+* Deployed on private subnets
+* Access by users within the Organization's AWS Network
+
+Consider you have a Api layer with two instances deployed in public subnet and it has a load balancer attached to it. Here client can send request to these instances through this load balancer as they are in public subnet. Now cosider we have one more layer of database with two instances in private subnet. It is also having a loadbalancer but it is a private load balancer. Now client wont be able to send traffic to this private load balancer from outside the vpc.In the same vpc, the instances or loadbalancers in pubic subnets can forward requests to resources in private subnets. 
+
+In configuring LB, we have two things. Listeners and Target Groups.
+Listener is the process that checks for connection requests using the protocol and port that we configure.
+there are variety of listeners. We can listen for requests that have specific http methods. If we are using ALB, we can listen for specific hostnames. Any requests that are destined for app1.com we can configure a listener and make it forward it to a target group. 
+Target groups route requests to one or more registered targets such as ec2 instances using the protocol and port number that we specify. Even ECS and lambda functions can be configured as target groups.
+we may have requests coming for app2.com/auth ,we can forward it to different target groups.which may be ECS. And we may have requests coming for app2.com/cart ,we can forward it to different target groups.which may be lambda functions.
+We can also configure health checks on particular target groups. Health checks are performed on all targets regestired to a target group that is specified to a listener in load balancer. Suppose if any instance fails health check, we can stopt routing traffic to that instance.
+----------------------------------------
+Demo : Load balancer
+
+Create 2 ec2 instances webserver-1 and webserver-2 both created in different AZ us-east-1a and us-east-1b and both are public servers. This is a good design as we have redundancy for AZ failure. And we have two public subnets for them. 
+Now lets configure load balancer to balance load across these two instances. Create two extra public subnets for loadbalancer. 
+Now come to EC2 page and choose loadbalancer in the left menu. 
+create load balancer --> application load balancer --> Name: web-lb --> Internet-facing --> IPv4 --> choose vpc: vpcdemo --> Choose 2 AZ and atleast 1 subnet per AZ : lb-us-east-1a and lb-us-east-1b subnets --> security group --> Listener and routing : HTTP port 80 (but we can change our port to any port number here) --> create a target group --> instances --> name: tg-web --> port HTTP 80 (as our app is listening on default port 80) --> choose vpc --> HTTP1 protocol version --> health checks : HTTP path: / -->  Next --> register targets : select the 2 instances -> port:80 -> Include as pending below -> create target group
+Tg is created Now refresh in the app lb creatin page and choose your tg (we can add more listeners here like https) --> create lb.
+Once the lb is created, select it and in details we can see DNS name of this lb ,copy it and paste it in browser and we can see our page . we can refresh page to see the page content server1 and server2 .
+Now instead of keeping our servers in public subnet, we can keep them in private subnet so that traffic of users will always go through load balancer.only lb should be on public subnet.This gives extra security.
+-------------------------------------
+VPN (Virtual Private Network):
+
+Assume that we have a vpc which contains a private subnet with certain number of resources deployed onto it. suppose we have a On-premise network and devices in our datcenter needs to talk to the resources in pvt subnet, and we need to be able to safely and securly establish connection between them, then we use VPN here. We deploy the vpn in our vpc which allows the connection between on prem datacenter to the resources in pvt subnet and it will be end to end encrypted.
+                                      IPSec
+               VPN Gateway -----------------------------> customer gateway
+                                  VPN Connection
+
+VPN architecture in AWS:
+Consider we have a VPC with CIDR block of 10.0.0.0/16 and we will have pvt subnet and have some resources within those subnet. We need to deploy the VPN gateway and it will terminate VPN on the AWS side. now consider we have on-prem network with CIDR block 192.168.0.0/16 and we need to deploy customer gateway in here. Customer gateway terminates VPN on the Customer side (It can be attachable to one VPC). Both customer gateway and VPN gateway will get public ip address (eg. 1.1.1.1 and 2.2.2.2 respectively). Now we can establish IP sec tunnel between them over the internet.
+
+VPN Routing:
+We have 2 types, static method and dynamic method. In static method, in which we manually define a route in the AWS routing table where we specify the IP of the on prem and for this VPN will be pointed and connection will be established between 2 sides.
+In dynamic method, We can configure dynamic protocol to exchange routes dynamically using BGP. So now VPN gateway will know how to get to that specific on prem network.
+
+VPN pricing:
+* Charged for each available VPN hour.
+* Charged for data transfer out from Amazon EC2 to internet.
+
+Note: In AWS, we are charged generally for outbound traffic and not the inbound traffic.
+
+VPN Gateway limits:
+* Maximum bandwidth per VPN tunnel of 1.25 Gbps
+* Maximum packets per second (140000)
+* Maximum transmission unit (MTU) (1466)
+--------------------------------------
+Direct Connect:
+
+It is a physical connection into AWS.An altrnate to VPN. In VPN, The data goes over the internet and internet can be unstable and un reliable hence Direct connect was introduced.
+                           Direct Connect
+corporate Datacenter --------------------------> AWS resources 
+
+Direct connect Architecture:
+consider we have On-Premise Network which has a customer Gateway . now in between this on prem and Aws resources, direct connect location which may be not owned by AWS and they may rent some space here to have routers in there. In this location, We have both customer Router and AWS router. Between them, cross connect is established which is the connection between a port on AWS router and customer router. and now vpn gateway is set up in the AWS for our vpc. and finally aws router will connect with VPN gateway and connection is established. We can also reach public services directly from AWS router and no need for VPN. 
+Direct connect will be faster and relible and low latency.
+
+Direct Connect pricing:
+* charged for Port Hours
+* charged for Outbound data transfer.
+---------------------------------------
+VPC peering:
+
+* By default resources in two different vpc cannot talk to each other since VPC acts as a network boundary. If we want to establish connection between them, we need to use VPC peering.
+VPC peering is the network connection between two vpc and it handles routing traffic between vpcs.
+With VPC peering, we can setup connection between VPCs in same region and vpcs in different region and also VPCs in different AWS accounts.  
+
+VPC peering pricing:
+* NO cost for VPC peering connection creation. 
+* Data transfered within an AZ via VPC peering is free.
+* Data transfer across VPC Peering between AZ incurs charges. 
+
+How does it work?
+Consider we have VPC 1 with CIDR 10.1.0.0/16 and VPC 2 with CIDR 10.2.0.0/16 . One VPC will send request to another for initiating peering. so the owner of VPC 1 will send peering request to owner of VPC 2. Once the request is sent, the owner-2 will except the peering request. Now peering is established between these VPCs. Next we need to handle the routing.this is to tell our VPC one about how the get to the 10.2.0.0/16 CIDR block. For this we need to create the route table where we define the CIDR of VPC 2 and target where we specify unique identifier of our Peering. So that any traffic from VPC 1 to VPC 2 will match this route and it'll notice send it across the peering.
+We need to do the same thing in the VPC 2 also by adding the CIDR of VPC 1 in routes.Now the instances in two different vpcs can communicate freely. 
+
+In case if we have 3 VPCs,and we have peering between VPC 1 to VPC 2 and VPC 2 to VPC 3.
+Now VPC 1 cannot talk to VPC 3 using VPC 2 a transitive. If we want VPC 1 and VPC 3 to talk to each other then we need to setup their own VPC peering as well.
+---------------------------------------
+Demo: VPC peering
+
+Create two VPCs VPC-A with CIDR 10.1.0.0/16 and VPC-B with CIDR 10.2.0.0/16. Create Server-1 in VPC-A and Server-2 in VPC-B. Login to Server-1 and try to ping the pvt ip of server-2.Ping is not successful. 
+Lets setup the VPC peering. Go to Peering connections in left menu in VPC --> create peering connection --> name: vpca to vpcb --> Requester: VPC-A --> Select another account for VPC to peer with (My account and this region) -->  Accepter VPC ID : VPC-B --> create. 
+Now in the peering connections, we have a "pending acceptance" status. Select it and actions --> Accept request. Now peering is successful.  But still we will be unable to ping the ip of server-2. We need to set up route between them. 
+Go to Route tables,select route table of VPC-A ,in the routes tab, we can see local route and default routes(igw) only.   
+Edit routes and in destination add 10.2.0.0/16 and in target choose peering connection: vpca to vpcb --> save
+Now VPC-A know about CIDR of VPC-B but still VPC-B doesnt know about VPC-A.
+In VPC-B add routes of 10.1.0.0/16 and choose vpc peering in target --> save
+Now try to do ping and ping is successful.Its all going through AWS infrastructure only and not the internet. 
+--------------------------------------
+Transit Gateway:
+
+WKT VPCs cant talk to eachother by default. To allow this,we need to setup vpc peering connection between them. As the number of VPC increases, it will become difficult to manage them by peering them each other. And if we have 4 VPC and we need to connect to them from on prem, then we need to setup vpn connection from customer gateway to all 4 VPC seperately. By this number of VPN will also increases. To address this issue, a service called Transit Gateway was created.
+The idea behinf Transit gateway is to avoid creating full mesh of VPCs and having to maintain all of them. 
+* Transit gateway acts as transitive routing device to route traffic between VPCs.
+* We must specify 1 subnet for each AZ to be used bt the transit gateway to route traffic. 
+Now consider we have 4 VPCs and we deploy a transit gateway. and these 4 VPC only need to peer or connect with transit gateway and no ned to peer with one another. And the transit gateway acts as a router that routes traffic between VPCs.
+With Transit Gateway, we no need 4 VPN connections, instead just connect the on prem customer gateway with Transit gateway. In same way we can also utilize direct connect.
+one Transit gateway can peer with other Transit gateway within same region or also between one region to another region and also transit gateway in different AWS account.
+---------------------------------
+Private link:
+Consider we have EC2 instance deployed in pvt subnet. And if this instance need to access S3 bucket, then we need to provide access to internetby creating NAT gateway or internet gatway. By doing this our EC2 instance will be exposed to internet which we dont want. This is wher Private links are used.
+Private links give your VPCs direct access to the public services like s3,lambda,cloudwatch etc so the traffic doesnt need to route through the internet.and our instance is more secure now. 
+Private links also allow the resources in one VPC to connect with services in another VPC using pvt ip addresses. Suppose if a third party company was providing some service and we need access to it,then we can create private link to the VPC that service runs into and give direct access as if it was hosted directly in our own VPC
+------------------------------------
+CloudFront:
+
+In the concept of global content delivery and edge locations, consider we have a webserver in N.America and if a user in N.America can access the applications without any latency but for the user in India, there will be high latency due to long distance.
+To solve this issue,AWS provides Edge locations. AWS has smaller edge locations scattered accross all globe. our web application files will be cached in these edge locations. Now the user from remote locations can send request to these edge locations instead of long distance webservers.This reduces latency. Cloudfront is basically a CDN. 
+
+Cloudfront is a web service that speeds up distribution of static as well as dynamic contents such as HTML,CSS,JS,media files like images,videos,song etc. so that users get access to them very fast. 
+When the user sends requests to cloudfront, their requests will be routed to Edge location first and they provide lowest latency or time delay so that content is delivered with best possible performance.
+
+Cloud front architecture:
+There is 'origin'. Origin is the source location for content that will be cached by cloudfront. Eg. images and files stored in S3 bucket is a origin. And cloudfront will take these files from origins and cache them in the edge locations.
+Now suppose we are configuring cloudfront, after origin,we need to configure distribution. Distribution is a configuration unit/block in cloudFront. In Distribution we tell cloudfront where we can find origin/source files, and cloudfront will create a dynamic domain name for us (eg. http://xyz.cloudfront.net). We can now access cached images at edge locations by using this domain. 
+If a user sends request to Edge location and if edge location doesnt have that content,then edge location will forward request to origin and get the content and display it to user.And now that content will be cached at edge location for fast retrieval.  
+cloudfront TTL:
+* Cached content at edge location remains for a set time known as time to live (TTL). 
+* TTL value decides content validity before an edge location requests the origin.
+* Default TTL is 24 hours.
+* Can be configured to have objects expire at a specific time. 
+
+Cache invalidation allows you to invalidate content cached at edge locations.
+suppose we have the version 1 of the file in origin and it is cached at edge location and now we have updated that file to version2 in the origin but the edge location still have version1 of that file and it will stay there till 24 hrs and the users will see the cached content only. To address this issue, we do cache invalidation which will remove all cacheed content in edge locations. and now if the user sends the request to the edge location, those files wont be there and it will send request back to origin and gets the new version2 file. Cache invalidation is done before the TTL expires.
+
+Cache Invalidations:
+* Invalidations are performed on a distribution. (we invalidate individual distributions)
+* You can invalidate all objects in a distribution,a specific folder,or a specific object. 
+* /* - Entire disribution invalidate.
+* /file.txt - individual file.
+* /images/* - All objects in images directory
+
+CloudFront - Basic integrations with Other Services.
+SSL/TLS is enabled by default and default domain name is https://xyz.cloudfront.net and AWS will provide default SSL certificate *.cloudfront.net and we can also setup our custom domain name: https://kodekloud.com where we can utilie AWS ACM and we can create certificate for our cloudFront distributions by using custom certificate.
+* Cloudfront will Automatically publishes operational metrics for distributions. 
+* We can enable extra metrics for additional cost as well. 
+
+Use cases:
+We can cache Static websites,video on demand and also for streaming
+--------------------------------------
+Demo: cloud front
+
+In AWS , go to S3 and create bucket with publically accessible. Upload a image to bucket. In the bucket policy, add the policy for s3:GetObject and save it. now we can access the file using object URL. Go to cloudfront and for origin domain choose your S3 bucket url --> In origin path we can choose the particular path if we have subfolders in our bucket (eg. /images) or else leave option empty --> name --> origin access : "Public" (choosed) (if users dont want to use cloudfront distribution,they can access s3 bucket directly for which bucket must be public) (or) "origin access control settings" (bucket can restrict access only to cloudfront) --> Default cache behaviour : Compress objects automatically: yes --> Protocol HTTP and HTTPS (or) Https only --> Allowed methods: Get,Head,put,post --> Web Application Firewall (WAF): Do not enable security protection --> use all edge locations --> if u have certificate,u can choose here --> create distribution
+Now our distribution is created. select it and we can see the Domain name. And now if we access this url, it wont load because we need to mention the name of the image as well along with this domain as a context path.This  domain name is accessing the edge location and not the S3 bucket. Now if we delete this image from s3 bucket,and upload another image with same name. But if we access the cloudfront domain,we still se the old image. This is because image is cached and it exists untill the ttl expires.
+Go to cloudfront distribution and in the "Behaviours" tab, and there will be default which is 86400 sec(1 day). so we need to do invalidation now.
+go to the "invalidations" tab --> create invalidation --> Add object path : /* --> create invalidation
+Now if we access the distribution domain, we can see the new image. 
+------------------------------------
+Lambda@Edge
+
