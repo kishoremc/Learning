@@ -1,5 +1,7 @@
 Kode Kloud solution Architect notes:
 
+Services: Networking
+
 VPC: (Virtual Private Cloud)
 It is a secured,isolated network segment hosted within AWS.
 They allow us to isolate resources from other resources in the cloud. (If we dont want applications to talk to each other)
@@ -335,7 +337,7 @@ VPN Gateway limits:
 * Maximum packets per second (140000)
 * Maximum transmission unit (MTU) (1466)
 --------------------------------------
-Direct Connect:
+Direct Connect: (for compliance reason)
 
 It is a physical connection into AWS.An altrnate to VPN. In VPN, The data goes over the internet and internet can be unstable and un reliable hence Direct connect was introduced.
                            Direct Connect
@@ -389,7 +391,7 @@ With Transit Gateway, we no need 4 VPN connections, instead just connect the on 
 one Transit gateway can peer with other Transit gateway within same region or also between one region to another region and also transit gateway in different AWS account.
 ---------------------------------
 Private link:
-Consider we have EC2 instance deployed in pvt subnet. And if this instance need to access S3 bucket, then we need to provide access to internetby creating NAT gateway or internet gatway. By doing this our EC2 instance will be exposed to internet which we dont want. This is wher Private links are used.
+Consider we have EC2 instance deployed in pvt subnet. And if this instance need to access S3 bucket, then we need to provide access to internet by creating NAT gateway or internet gatway. By doing this our EC2 instance will be exposed to internet which we dont want. This is where Private links are used.
 Private links give your VPCs direct access to the public services like s3,lambda,cloudwatch etc so the traffic doesnt need to route through the internet.and our instance is more secure now. 
 Private links also allow the resources in one VPC to connect with services in another VPC using pvt ip addresses. Suppose if a third party company was providing some service and we need access to it,then we can create private link to the VPC that service runs into and give direct access as if it was hosted directly in our own VPC
 ------------------------------------
@@ -438,4 +440,197 @@ go to the "invalidations" tab --> create invalidation --> Add object path : /* -
 Now if we access the distribution domain, we can see the new image. 
 ------------------------------------
 Lambda@Edge
+
+Cloudfront functions and Lambda@edge:
+Using this feature, we can write light weight functions that can run at these edge locations and these functions can perform variety of operations like manipulating the requests and responses that flow through cloud front, also they can perform basic authentatication,authorization as well as generate responses at the edge so that we dont need a physical server now so that all the logic happens at edge location itself.
+
+When do functions Run?
+Cloud front functions:
+* Cloudfront funcs will run when cloudfront receives a request from a viewer (viewer request).
+* Before Cloud front returns the response to the viewer (viewer respose) 
+
+Lambda@edge functions:
+* When cloudfront receives a request from a viewer (viewer request)
+* Before cloudfront forwards a request to the origin (origin request)
+* When cloudfront receives a response from the origin (origin reponse)
+* Before cloudfront returns the response to the viewer (viewer response)
+
+Cloudfront functions use cases: (for running small functions)
+1. Cache key normalization (transform http request attributes to create optimal cache key which improves caching ratio)
+2. Header manipulation (we can insert,modify,delete http headers)
+3. Url redirects or rewrites
+4. Request authorization (validate Json web tokens by inspecting authorization headers)
+
+Lambda@ege use cases:
+* Long-running functions
+* configurable CPU and memory functions
+* Dependencies on third-party libraries
+* Network-dependent functions 
+* File system or HTTP Request Access functions
+------------------------------------------
+Global Accelerator: (for optimizing paths)
+Consider our application deployed in N.America and user access it through remote locations, then the request will go through the internet and they have inefficient path, they are not reliable as well and latency will also be more. Global accelerator will help address this issue so that we can improve the experience of end users.
+When we enable Global accelerator, we have access to all their edge location. These edge locations are different compared to cloudfront edge locations. Now when a user sends the request so they can talk to our application,it will reach the closest global accelerator edge location. By this user will no need to go through regular internet and instead they go through AWS backbone network. So now it will be much faster connection and secure.
+AWS backbone is lot faster compared to other regular internet providers. 
+--------------------------------------------
+Route53:
+
+* An AWS managed DNS service 
+* Acts as a domain registrar - purchase domains similar to sites like Godaddy and Namescheap (eg. www.kodekloud.com)
+* A global service - not specific to a region
+
+Hosted zones: collection of DNS records for specic domains.
+Our domain name will be created using hosted zone. We define all of our records and rules in Hosted zone. When we create hosted zones for specific domains, AWS will reserve/allocate 4 nameservers to hosted zones.
+-------------------------------------
+Demo: Route53
+
+Go to rout53 --> domains --> registered domains --> enter your domain and checkits availability : kokeklouddemo123.com -> select it --> proceed to checkout --> check box of auto-renew --> next --> provide you contact details --> Verify (we also incur small charge for hosted zone) --> Submit
+Wait for some hours and now we can see our domain name in the list.And we can see the 4 nameservers allocated to this. Go to hostedzone and we can see one hosted zone. And in that we can see dns records configured automatically. We can create more DNS records by clicking on create record --> A record (to point to ip of our webserver) --> Recordname: www or leave it empty (subdomain) and paste the ip in the value --> create record
+view status and wait till u see INSYNC.
+Now go to browser and enter 'kodeklouddemo123.com' and we can see our web page. 
+---------------------------------------
+Route 53 Application Recovery controller
+It is a service that contineously monitors applications ability to recover from failure. And to control app recovery accross multiple AWS regions and AZ. 
+
+Consider we have application deployed in one region and a stand by app deployed in another region. we can use Application Recovery Controller to monitor backup environment. Make sure its up and running,scaled up and configured properly so that we know that when the time comes that do we need to failover to it, it will be up and running. Based on our previous configuration, we can have Application Recovery Controller to monitor our primary deployment. If any issue in our primary app, then we can failover to backup site. We can divert all trffic to backup site untill we figure out the issue in primary site. 
+We can also use ARC to manually diversion of traffic. 
+
+Application Recovery Controller Architecture:
+Consider we have our active application in us-east-1 region with lb and ec2 (this full this is cell-1) using a global dynamo db (resource set) and we have a failover setup in us-west-1 region with same setup (cell-2). We have route53 on top of these which sends traffic to active region and if any issue, we can modify in route53 to send traffic to standby region.
+* cell groups all resources required for an application to operate independently. 
+* Recovery group is a collection of cells that represent an application that i want to check for failure readiness. It monitors both active and standby site.
+* Resource set is a set of AWS resources that can span multiple cells. 
+We can setup Application Recovery Controller to do readiness checks to monitor the readiness of the standby deployment.
+* Routing Control allows you to manually failover entire application stack to standby site. And finally Route53 will do the failover.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+Services: Storage
+
+Elastic Block storage (EBS):
+Block storage breaks up data into blocks and then store these blocks as seperate pieces each with a unique identifier. And these blocks can then we stored across number of physical devices. A collection of blocks can be presented to you OS as a volume.Then we can create File system on top of it. We can also present it as a hard drive which allows us to install OS on it to boot up.
+* So Block storage is both mountable and bootable. (IMP)  
+AWS Elastic block storage (EBS) is the same.
+We can attach EBS to an instance,detach it and attach it to another instance. And all data remains intact.
+Normally EBS volumes can be attached to a single ec2 instance whereas certain volumes can allow multi attach where multiple instances can attach to same volumes. Where our application must be intelligent enough to not have multiple ec2 instances write to the same data at same time and this may lead to curropt the data. 
+Eg. DB clusters will be intelligent enough to have master node responsible for writing to data and worker nodes just read from it. 
+
+EBS volumes must be provisioned in an AZ.Redundancy is built in within the AZ. It can handle physical device going down but data is lost if entire AZ goes down. 
+To attach ebs volume to ec2 instance, both must be in same AZ. But incase if we want the data in the volume of one AZ to be available in another AZ,then there is a feature called "snapshot". We create a snapshot of the volume in AZ1 and from this snapshot we can create new volumes in another AZ2.And then we can attach this newly created volume to EC2 instance.Snapshots can be stored in S3. 
+Next to get the data between regions, again we can take snapshot of ebs volume in region1 and keep it in s3 bucket and then we can copy the snapshot to another s3 bucket in another region and finally create volume out of this snapshot.
+
+EBS volume types: 
+1. General purpose SSD [gp2 & gp3] 
+2. Provisioned IOPS SSD volumes
+3. Throughput Optimized HDD volumes.
+4. cold HDD volumes
+5. Magnetic
+
+General purpose SSD [gp2 & gp3] :  {max 16TiB vol size, 16,000 iops per volume, 1000 MiB/s max throughput per volume(gp3)}
+These are volumes backed by SSD (Solid state Drives). They give better pricing and performance. we can use them for wide variety of workloads like virtual desktops,medium size,single instance dbs,latency sensitive interactive applications, as well as dev and test environments. We can startoff with SSD. They dont support multi attach.
+There are 2 types gp3 and gp2 volumes.
+* gp3 volumes are latest generation SSD volumes and lowest cost volumes offered by aws.  
+this Volume type provides right balance of price and performance for most apps.It aso helps scale volumes performance indepedently of volume size.gp3 offers 20% lower price compared gp2 volumes. 
+* gp2 volumes are default volume types for ec2 instances. They offer cost effective storage ideal for broad range of transactional workloads.The performance scales with volume size.
+
+Provisioned IOPS SSD volumes (io1 and io2):
+They are backed by SSD (Solid state Drives)
+These are the heighest performance EBS storage volumes. They are designed for critical,IOPS intensive,Throughput-Intensive workloads.
+The different versions available are,
+1. Provisioned IOPS SSD (io2) volumes   {max 16TiB vol size, 64,000 iops, 1000 MiB/s max throughput per volume}
+2. Provisioned IOPS SSD (io2) Block Express volumes      {max 64TiB volsize, 256000 iops , 4000 MiB/s max }
+3. Provisioned IOPS SSD (io1) volumes.
+
+io2 has more durability compared to io1 volumes (99.999% durability). They support multi attach. used for high intensity workloads like db workloads needs more performance.
+
+Throughput-Optimized HDD and Cold HDD volumes.
+They are traditional HDD based volumes and they can be slower. Thre are 2 types.
+1. Throughput-optimized HDD : Low cost HDD designed for frequently accessed throughput intensive workloads
+2. Cold HDD: It is the lowest cost HDD designed for less frequently accessed. (cheapest)
+
+Throughput-optimized HDD {500 iops/vol, 500 mib/s max throughput per vol}
+Cold HDD {250 iops/vol, 250 mib/s max throughput per vol}
+max vol size for both 16 TiB
+
+Magnetic volumes:
+They are previous genertions of volumes backed by magnetic drives. Suaitable for dataset,infrequent data access and performance is not of primary importance.Max iops of 200 and vol size upto 1 TiB
+
+EBS pricing:
+We are charged per GB per Month. Cost also depends on the volume type selected. Faster IOPS more cost. Snapshots are also charged per GB per month. This is for full snapshot and not for incremental snapshot ,we are paying full cost. 
+
+The thing that seperates block storage is that we can both Boot and mount block storage unlike file system storage and object storage.(IMP for exam)
+------------------------------------------
+Demo: EBS Part1
+
+Create 3 servers in us-east-1 region , in which server-1 and server-2 in us-east-1a AZ & server-3 in us-east-1b AZ and server-4 in us-west-2 region
+Go to volumes and create volume --> gp2 --> 10 GB --> AZ : us-east-1a --> enable encryption --> create
+Give a name: demo-volume ,it will be in available state. select it and actions --> attach volume --> choose instance :server-1 --> devise name : /dev/sdf (but it can also be /dev/xvdf thru /dev/xvdp) --> attach
+Login to server1 and run lsblk to list our all the volumes attached to this. We can see output xvda and xvdf. xvda is the root / volume that we got when we created our instance. the sdf got renamed to xvdf as per the note while attaching volume. First we need to check if there is any file system in the attached volume 
+--> sudo file -s /dev/xvdf       (o/p: /dev/xvdf: data  --> indicates that there isn't any file system currently)
+Now lets create a file system on this volume
+--> sudo mkfs -t xfs /dev/xvdf
+Now the file system is created. Now re run the previous command to see the fs.
+Now lets mount this fs in a directory 
+--> cd /
+--> sudo mkdir ebsdemo
+--> sudo mount /dev/xvdf ebsdemo 
+--> df -kh       (to see the mount)
+This is a temporary procedure to mount and if we reboot the volume, it will no longer be mounted. In order to make this permanent,we need to configure fstab for which first we need to get the unique identifier for our ebs volume.
+--> sudo blkid  (o/p: /dev/xvdf: UUID="045ddc53-453-986c") and copy it
+--> sudo vi /etc/fstab
+We can notice how other mounts are setup and add a new line 
+UUID=045ddc53-453-986c  /ebsdemo  xfs  defaults,nofail  (add this and save file)
+--> sudo mount -a  (this will automatically mount whatever listed in the fstab file)
+--> cd /ebsdemo/
+--> sudo echo "this is test comment on server1" > demo.txt
+
+Now lets detach this volume from this instance and attach it to another instance
+--> cd /
+--> sudo umount /ebsdemo 
+--> df -kh  (verify it)
+go to volumes select it and actions --> detach volume. again select it and attach it to server-2 (in same AZ). login to server-2 now and verify if it is attached.
+--> lsblk   (/dev/xvdf)
+--> sudo file -s /dev/xvdf  (we can see the file system because we created it in another machine)
+--> cd /
+--> mkdir ebsdemo
+--> sudo mount /dev/xvdf /ebsdemo
+--> cd ebsdemo
+--> ls   (o/p: demo.txt)
+
+Like this we can perform these steps if we are performing maintanance or migrating our data between instances.
+------------------------------------
+Demo EBS : Part-2
+
+Now lets move our ebs volume to server-3 which is in different AZ. 
+Unmount your ebs volume first
+--> sudo umount /ebsdemo
+--> df -kh
+Detach it . now select volume again and we need to create snapshot --> name: my-snapshot --> create snapshot
+once it is availabe, select that snapshot --> actions --> create volume from snapshot --> choose AZ: us-east-1b --> encrypt --> tag --> create.
+our volume is now created in us-east-1b and now we can select it and attach it to server-3 on /dev/sdf --> attach
+login to server-3 and lsblk
+--> sudo file -s /dev/xvdf  (o/p: xfs filesystem is present)
+--> sudo mkdir /ebsdemo
+--> sudo mount /dev/xvdf /ebsdemo
+--> cd /ebsdemo/
+--> cat demo.txt
+
+Next inorder to copy the volume to server-4 in different region, we cannot follow the same steps as before. For this we need to copy it to s3 bucket or to desired region.
+Select the snapshot --> actions : copy snapshot --> description: copy of my snapshot -->Destination region : us-west-2 --> copy snapshot
+Now we can go to us-west-2 and see the copy of our snapshot.select it and create a volume in this region in same AZ as our instance and finally attach it to server-4. Follow the remaining steps from above
+----------------------------------
+Instance store
+
+Instance store provides temporary block level storage for our ec2 instances. Depending on ec2 instance type, AWS may provide instance store which is temporary block level storage.
+Instance store are located physically on disks attached to the host computer. Unlike EBS volumes, where ebs data is stored on seperate m/c and we connect to it remotely, Instane store is physically on host computer thst your EC2 instance run.
+Instance store is only meant for temporary storage or information that changes frequently like tempory content or scratch data. 
+
+Instance storage Architecture:
+consider we have 2 ec2 instances running on our host machine. as the instance store are physical disks that are on the host machine, so when our EC2 instance go down ,and come back online it will still have access to instance store. Even if it is temporary,if the ec2 instance is on same host, then it will always have access to same instance store. 
+Problem arises when te EC2 instance goes down and come back on another host-2. So now it wont be able to access that instnce store as it recide on completely seperate host. But instead The new ec2 on another host will have access to instance store in that particular host. But all of the data it had on instance store 1 is now gone. It will be starting with a blang state on instance store 3. Thats why it is called temporary storage.
+---------------------------------------
+Demo: Instance store Volumes
+
+
+
+
+
 
