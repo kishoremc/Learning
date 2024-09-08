@@ -13,18 +13,18 @@ run the set of commands for linux in your server and terraform is installed.
 Incase if you are dowloading as a binary, you run it as wget <paste-the-link>
 --> unzip <binary-name>
 --> sudo mv terraform /usr/bin/
-Sourse code editor can be choosed anything eg: vscode,Atom,sublime,pycharm,notepad
+Source code editor can be choosed anything eg: vscode,Atom,sublime,pycharm,notepad
 Install visual studio code. install vscode extentions. goto extentions --> search hashicorp terraform --> click and install it.
 -----------------------------------------------------------------------------------
 Deploying Infrastructure with terraform:
 
 Authentication & authorization :
-For creating resources in aws using teraform, we need to authenticate terraform first.
+For creating resources in aws using terraform, we need to authenticate terraform first.
 Authentication is the process of verifying who a user is. Authorization is the process of verifying what they have access to.
-Depending on the provider the type of access access credentials would change. eg: for AWS needs access and secret keys. For Github needs token, for k8s needs kubeconfig file etc. We should cut short the level of access only as required.
+Depending on the provider the type of access credentials would change. eg: for AWS needs access and secret keys. For Github needs token, for k8s needs kubeconfig file etc. We should cut short the level of access only as required.
 ------------
 Create user for AWS account:
-Go to AWS --> IAM --> user --> cerate user --> name: terraform --> permissions --> attach policy directly --> administrator access --> create user
+Go to AWS --> IAM --> user --> create user --> name: terraform --> permissions --> attach policy directly --> administrator access --> create user
 click on the user --> security credentials --> generate access key --> command line interface --> create.
 copy access and secret key and save it. 
 ------------
@@ -58,7 +58,7 @@ The provider block will always remain same. only your resource block will change
 -------------------------
 Providers and Resources:
 Terraform supports multiple providers.visit "registry.terraform.io" we can see there are more than 3000 providers.
-Provider is a plugin that lets terraform manage an external API. When we run "terraform init", plugins required for providewr are automatically downloaded and saved locally to a .terraform directory.
+Provider is a plugin that lets terraform manage an external API. When we run "terraform init", plugins required for provider are automatically downloaded and saved locally to a .terraform directory.
 this is similar for working with azure. Eg: provider azurerm {}  --> terraform init
 ----
 Resource block describes one or more infrastructure objects. Eg: resource "aws_instance" "myec2"{},resource aws_alb,
@@ -75,7 +75,7 @@ The core concepts,standard syntax remains same across all of provider. We no nee
 There may be issues in provider, but very rare and you can raise issue in  the terraform github page
 --------------------------
 Provider Tiers:
-there are 3 types of provider tiers in terraform. which are official,partner,community. In the registy page, we can check boxes and see them. We should always use official providers. Official providers have namespace of hashicorp. Namespace here means the route path visible when we click on any official providers.
+there are 3 types of provider tiers in terraform. which are official,partner,community. In the registry page, we can check boxes and see them. We should always use official providers. Official providers have namespace of hashicorp. Namespace here means the route path visible when we click on any official providers.
 Terraform requires explicit source information for any providers that are not HashiCorp-maintained, using a new syntax in the required_providers nested block inside the terraform configuration block.
 
 terraform {
@@ -129,12 +129,12 @@ It will destroy all the resources that are created within the folder from which 
 --> terraform destroy  (It will try to delete 2 resources one is git repo and another is instance)
 In case to destroy specific resource, we need to specify -target flag.
 --> terraform destroy -target aws_instance.myec2   (o/p: only ec2 instance is deleted)
-Now all though we have deleted the instance, but still the code is present in our .tf file. And one applying, terraform will proceed to create that resource again. So we need to remove it from the code or we can just comment it out.
+Now all though we have deleted the instance, but still the code is present in our .tf file. And on applying, terraform will proceed to create that resource again. So we need to remove it from the code or we can just comment it out.
 -----------------------------
 terraform statefile:
 terraform stores the state of the infrastructure that is being created from the TF files. The state allows terraform to map the real world resource to your existing configuration. We can see the state file in our folder by name "terraform.tfstate" . And also we can see "terraform.tfstate.backup" In the file, under the resource section, we can see our resource. when we destroy any resource, its state information will be removed from this file.
 statefile also contains many other informations like instance id,pvt ip,pub ip,security group info etc.
-It is not recommended to touch or modify anything in this statefile.
+It is not recommended to touch or modify anything in the statefile.
 -----------------------------
 Desired and current states:
 Terraform's primary function is to create,modify,and destroy infrastructure resources to match the desired state described in a terraform configuration.
@@ -163,12 +163,12 @@ terraform {
     }
   }
 }
-now if we do terraform init, .terraform folder is created and also 1 more file .terraform.lock.hcl  is created & we can see it will install 3.27 version. later in future it may also install plugin version of 3.30 and etc. But this is not recommended in production environment. and we need to use specific version here. In the .terraform.lock.hcl file, we can see provider path,version installed,constraints etc. Now if we change the version in the provider.tf file to "~>2.0" and again do terraform init, we will get error saying that configured version constraint ~>2.0 .For that we need to delete the lock file and apply. So this lock file primarily helps to stick to a specific version. If we want t upgrade the version even without deleting the lock file, we need to run command --> terraform init -upgrade.
+now if we do terraform init, .terraform folder is created and also 1 more file .terraform.lock.hcl  is created & we can see it will install 3.27 version. later in future it may also install plugin version of 3.30 and etc. But this is not recommended in production environment. and we need to use specific version here. In the .terraform.lock.hcl file, we can see provider path,version installed,constraints etc. Now if we change the version in the provider.tf file to "~>2.0" and again do terraform init, we will get error saying that configured version constraint ~>2.0 .For that we need to delete the lock file and apply. So this lock file primarily helps to stick to a specific version. If we want to upgrade the version even without deleting the lock file, we need to run command --> terraform init -upgrade.
 terraform dependency lock file allows us to lock to a specific version of a provider.
 ------------------------------
 terraform refresh:
 Incase if the infrastructure gets manually modified,we use terraform refresh command. This command will check the latest state of your infrastructure and update the statefile accordingly.
-terraform refresh happens automatically when we do terraform plan or apply and we should not do it manually as it is not at all recommended. Example if we have done terraform apply and created an instance in us-west-2 region and next if we change the prvider configuration file and modified the region to us-east-1 and save file. now if we do terraform refresh all the configuration is lost inside the state file. Then we have terraform.tfstate.backup file which we can make use of and find the lost configurations in it. And hence versioning is enabled and stored the backup in s3 so that we can revert our statefile back later.
+terraform refresh happens automatically when we do terraform plan or apply and we should not do it manually as it is not at all recommended. Example if we have done terraform apply and created an instance in us-west-2 region and next if we change the provider configuration file and modified the region to us-east-1 and save file. now if we do terraform refresh all the configuration is lost inside the statefile. Then we have terraform.tfstate.backup file which we can make use of and find the lost configurations in it. And hence versioning is enabled and stored the backup in s3 so that we can revert our statefile back later.
 Terraform refresh command is deprecated in the newer version of terraform , and now we can use "-refresh-only" option.
 ------------------------------
 AWS provider- Authentication configuration:
@@ -245,7 +245,7 @@ organizations can continue to use the approach that suits best in its environmen
 Create Elastic IP with Terraform:
 
 Elastic IP address is a static IPv4 address in AWS that you can create and associate it with EC2 instance.
-Go to eip_aws documentation and copy code an paste it in eip.tf file in ur vscode
+Go to eip_aws documentation and copy code and paste it in eip.tf file in ur vscode
 
 resource "aws_eip" "lb" {
   instance = aws_instance.web.id              # optional, you can mention your instance id here
@@ -265,15 +265,15 @@ now create an instance and eip using terraform code and we can see that public i
 --------------------------------
 Cross Resource Attribute References:
 
-It can happen that a single terraform file,you are defining two different resources. however resource 2 might be dependent on some vlue of resource 1.
+It can happen that a single terraform file,you are defining two different resources. however resource 2 might be dependent on some value of resource 1.
 Eg: We have a elastic ip and a security group and whatever elastic ip is created, we need to whitelist that ip in our security group i.e allow 443 from Elastic IP. we should not add the elastic ip after its creation, it should automatically get added in security group.
 For this first we need to identify which attribute stores the public IP associated with EIP resource. It is "public_ip".
 We have to find a way in which attribute value of "public_ip" is referenced to the cidr_ipv4 block of security group rule resource.
 Terraform allows us to reference the attribute of one resource to be used in a different resource.syntax is <resource type>.<name>.<attribute>
 create a file named "cross-reference-attributes.tf"
 
-resourc "aws_eip" "lb"{
-  doamin = "vpc"
+resource "aws_eip" "lb"{
+  domain = "vpc"
 }
 
 resource "aws_security_group" "allow_tls" {
@@ -316,7 +316,7 @@ ${...} This syntax indicates that terraform will replace the expression inside t
 -----------------------------
 Output values:
 It makes information about your infrastructure available on the command line, and can expose information for other terraform configurations to use.
-Eg: consider user as given instruction to terraform to create ec2 instance and also give its public IP to him after creation.He can request terraform to fetch the information about ec2 and return the public ip to him.
+Eg: consider user has given instruction to terraform to create ec2 instance and also give its public IP to him after creation.He can request terraform to fetch the information about ec2 and return the public ip to him.
 
 Q: create the Elastic IP (Public IP) resource in AWS and output the value of the EIP.
 
@@ -330,7 +330,7 @@ output "public-ip" {
 
 --> terraform apply     (o/p: public-ip = "44.195.104.191")
 
-Here we have used the output resource block and its name can be anything.And in value, we have referenced the attribute. 
+Here we have used the output resource block and its name can be anything. And in value, we have referenced the attribute. 
 We can also have customization
 Eg:
 output "public-ip" {
@@ -426,7 +426,7 @@ resource "aws_instance" "myec2" {
 Next create variables.tf and add below content
 variable "ami" {}
 
-Next create terrafirm.tfvars and add below content
+Next create terraform.tfvars and add below content
 ami = "ami-0e670eb768a5fc3d4"       # ap-south-1
 
 If we specify default value inside the variable, and if we dont specify any variable inside the .tfvars file, then terraform will pick the default value.
@@ -491,7 +491,7 @@ Terraform loads variables in the following order,with later sources taking prece
 4. Any *.auto.tfvars or *.auto.tfvars.json files,processed in lexical order of their filenames.
 5. Any -var and -var-file options on the command line.
 
-So here 5th point has heighest precedence.
+So here 5th point has highest precedence.
 
 NOTE: The Environment variable defined in system has more precedence than default variable.
 
@@ -514,7 +514,7 @@ We can restrict the value of a variable to a data type.
 Eg: only numbers should be allowed in AWS usernames.
 data-types.tf
 
-variable "username {
+variable "username" {
   type = number
 }
 resource "aws_iam_user" "lb" {
@@ -3183,4 +3183,3 @@ NOTE: make sure you are Firewall is not blocking the PSI secure browser software
 On the Day of exam Please login 15 min earlier and launch your exam. 
 After we Register for the exam, We can see our exam date,time informations.
 ----------------------------------------
-Important Pointers for Exam-1 :
