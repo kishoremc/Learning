@@ -1,0 +1,279 @@
+# Commands to Install ansible in ubuntu:
+
+sudo apt-add-repository ppa:ansible/ansible
+sudo apt update -y
+sudo apt install ansible -y
+
+ansible --version
+
+sudo vi /etc/ansible/hosts
+
+<pvt_ip of Host1> ansible_user=ubuntu ansible_become_user=root
+<pvt_ip of Host2> ansible_user=ubuntu ansible_become_user=root
+      ...              ...                ...
+<pvt_ip of HostN> ansible_user=ubuntu ansible_become_user=root
+
+[Group1]
+<pvt ip of Host1>
+
+[Group2]
+<pvt ip of Host2>
+
+Establish passwordless connection between ansible controller and host pc
+ssh-keygen -t rsa
+cat /home/ubuntu/.ssh/id_rsa.pub
+(copy and paste in the target pc in path /home/ubuntu/.ssh/authorized_keys)
+ansible all -m ping
+
+-----------------------------------------------------------------------------------------------------------
+# Ansible ad-hoc commands:
+
+ansible all -m setup --> To gathers all the information from target hosts
+ansible all -m shell -a "free -mh" --> To see free memory in all target machines
+ansible frontend -m file -a "path=/home/ubuntu/demo_2.txt state=touch" --> To create file in target host1
+ansible all -m file -a "path=/home/ubuntu/demo_3.txt state=directory" --> To create directory in all target hosts
+ansible frontend -m copy -a "src=/tmp/test_file dest=/home/ubuntu/demo/" --> To copy file from ansible controller to target hosts 
+ansible backend -m fetch -a "src=/home/ubuntu/host2_file.txt dest=~/host2_file.txt"  --> To get the file from target host to ansible server machine
+ansible backend -m apt -a "name=unzip state=latest" --become  --> To install "unzip" package in target host 2
+
+--------------------------------------------------------------------------------------------------------------
+# Playbook to install jq in target hosts  (play1.yml)
+
+---
+ - name: play1
+   hosts: all
+   tasks:
+     - name: install jq
+       become: true
+       apt:
+          name: jq
+          state: present
+          update_cache: yes
+
+--> ansible-playbook play1.yml --syntax-check
+--> ansible-playbook play1.yml
+----------------------------------------------------------------------------
+# playbook to uninstall jq in target hosts
+
+---
+ - name: play2
+   hosts: all
+   tasks:
+     - name: uninstall jq
+       become: true
+       apt:
+          name: jq
+          state: absent
+          update_cache: yes
+------------------------------------------------------------------------------
+# playbook to install multiple softwares in single task
+
+---
+ - name: play3
+   hosts: all
+   tasks:
+     - name: install jq
+       become: true
+       apt:
+          name: jq
+          state: present
+          update_cache: yes
+
+     - name: install memcached
+       become: true
+       apt:
+          name: memcached
+          state: present
+          update_cache: yes
+
+     - name: install tree
+       become: true
+       apt:
+          name: tree
+          state: present
+          update_cache: yes 
+--------------------------------------------------------------------------------
+# playbook to install multiple softwares in single task using looping (method-1)
+
+---
+ - name: play4
+   hosts: all
+   tasks:
+     - name: install multiple softwares using looping
+       become: true
+       apt:
+          name: "{{ item }}"
+          state: present
+          update_cache: yes
+       with_items:
+            - git
+            - nginx
+            - memcached
+            - jq
+            - curl
+            - wget
+----------------------------------------------------------------------------------
+# playbook to uninstall multiple softwares in single task using looping (method-2)
+
+---
+ - name: play5
+   hosts: all
+   tasks:
+     - name: uninstall multiple softwares using looping
+       become: true
+       apt:
+          name: [git,nginx,memcached,jq,curl,wget]
+          state: absent
+          update_cache: yes
+-----------------------------------------------------------------------------------
+# playbook to execute task based on the condition
+
+---
+ - name: play6
+   hosts: all
+   tasks:
+     - name: install jq
+       become: true
+       apt:
+          name: jq
+          state: present
+          update_cache: yes
+       when:
+         - "ansible_pkg_mgr": "apt"
+         - "ansible_distribution": "Ubuntu"
+         - "ansible_os_family": "Debian"
+-------------------------------------------------------------------------------------
+# playbook to install software, start and get the status of that software
+
+---
+ - name: play7
+   hosts: ec2user
+   tasks:
+     - name: install httpd
+       become: true
+       yum:
+          name: httpd
+          state: latest
+          update_cache: yes
+
+     - name: start httpd
+       become: true
+       service:
+          name: httpd
+          state: started
+
+     - name: collect status of httpd
+       become: true
+       command: service httpd status
+       register: result
+       ignore_errors: yes
+
+     - name: showing report
+       debug:
+         var: result
+--------------------------------------------------------------------------------------------
+# playbook to use variables
+
+---
+ - name: play8
+   hosts: all
+   vars:
+     var1: hello
+   tasks:
+     - name: variable demo
+       debug:
+         msg: "{{ var1 }}"
+
+
+ansible-playbook play8.yml --extra-var var1=world
+--------------------------------------------------------------------------------------------------
+# playbook to execute specific task using tags
+
+---
+ - name: play9
+   hosts: all
+   tasks:
+     - name: install jq
+       become: true
+       apt:
+          name: jq
+          state: present
+          update_cache: yes
+       tags:
+          - apt-jq
+     - name: install jq
+       become: true
+       yum:
+          name: jq
+          state: present
+          update_cache: yes
+       tags:
+          - yum-jq
+     
+ansible-playbook <playbook-name> --tags="tag-name1"
+ansible-playbook <playbook-name> --skip-tags="tag-name2"
+ansible-playbook <playbook-name> --tags="tag-name1,tag-name2"
+#----------------------------------------------------------------------------------------------------
+# playbook of handlers
+
+---
+- name: play10
+  hosts: ec2user
+  become: true
+  tasks:
+    - name: Install the latest version of Apache
+      dnf:
+        name: httpd
+        state: latest
+
+      notify:
+       - Start Apache
+
+  handlers:
+     - name: Start Apache
+       service:
+         name: httpd
+         state: started
+-----------------------------------------------------------------------------------------------------
+ansible roles
+
+ansible-galaxy init myrole
+-----------------------------------------------------------------------------------------------------          
+
+---
+- hosts: ec2user
+  tasks:
+  - name: Install httpd Package
+    yum: name=httpd state=latest
+  - name: Copy httpd configuration file
+    copy: src=/home/ubuntu/test dest=/home/ec2-user/test
+  - name: Copy index.html file
+    copy: src=/home/ubuntu/index.html dest=/var/www/html
+    notify:
+    - restart apache
+  - name: Start and Enable httpd service
+    service: name=httpd state=restarted enabled=yes
+  handlers:
+  - name: restart apache
+    service: name=httpd state=restarted
+-----------------------------------------------------------------
+1. create index.html file in home path with a content in it
+2. copy the task section of yml including notify into the main.yml of the task role
+3. copy the handlers section into the main.yml of handlers role
+4. create a yml file to execute the role and add below content in it
+
+---
+ - hosts: ec2user
+   become: true
+   roles:
+   - myrole
+
+5. execute the playbook as ansible user
+   ansible-playbook <roleplaybookname>
+
+6. access the web page by copying the public ip of ec2user server
+
+----------------------------------------------------------------------------- 
+
+
+

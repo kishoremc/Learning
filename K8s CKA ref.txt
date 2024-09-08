@@ -1,0 +1,240 @@
+kubernetes by default runs on port 2379
+ETCD will run as a pod in the kube-system namespace in the kubeadm set up of k8s cluster.
+In the etcd.service file, we can see --advertise-client-urls https://${{INTERNAL_IP}}:2379\\ . This is the address on which etcd listens and this is the url thet needs to be configured in the kube-api server to connect with etcd
+If we have multiple etcd clusters for HA, we need to specify that in "initial-cluster" field in the etcd.service file.
+ETCDCTL is the CLI tool used to interact with ETCD. 
+When we send a request to k8s cluster, it first reaches kube-api server and it will authenticate the requests and validates it. It then retrieves the data from edcd cluster and responds back with the information .
+Instead of kubectl commands, we can also invoke the apis by sending POST requests. 
+The kube-scheduler identifies the right node to place the new pod created and communicates it back to kube-apiserver. Then apiserver updates that information in etcd cluster and passes that same information to kubelet in the appropriate worker node.
+The kubelet then creates the pod on the node and instructs the container runtime engine to deploy the application image. once done ,the kubelet updates the status back to the apiserver and apiserver updates that data back in the etcd cluster. Kube api-server is the only component that interacts with etcd cluster
+certificates are used to secure the connectivity between different components. We specify the location of etcd servers at 
+"--etcd-servers"=https://127.0.0.1:2379 \\" in the kube-apiserver.service. kube apiserver run as a pod in the kubeadm kind of k8s cluster in kube-system ns.
+cat /etc/kubernetes/manifests/kube-apiserver.yaml in the kubeadm setup
+cat /etc/systemd/system/kube-apiserver.service in the non kubeadm setup
+We can see the running process by --> "ps -aux | grep kube-apiserver" in the master node
+There are lot of controllers like node controller, replication controller etc in the k8s cluster and all the are managed by kube controller manager. It also run as a pod in the kube-system namespace in the  kubeadm k8s cluster.
+cat /etc/kubernetes/manifests/kube-controller-manager.yaml in the kubeadm setup
+cat /etc/systemd/system/kube-controller-manager.service in the non kubeadm setup
+kube scheduler will only decide which pod should go to which node and it doesn't place the pods on nodes. That is the job of kubelet. The scheduler filter outs the nodes with less capacity and ignores them and next ranks the nodes to identify in which node more capacity(eg:cpu) will be left even after scheduling the pods and schedules the pod into it. similarly it runs as a pod in the kube system ns in the master node.
+The path is /etc/kubernetes/manifests/kube-controller-manager.yaml .
+Once kubelet instructs the runtime engine to pull image and deploy application, It contineously monitors the state of the pods. The kubeadm tool does not automatically deploy the kubelet and we need to manually install it in the worker node. to view the kubelet running process, ps -aux | grep kublet .
+kube-proxy: Due to pod networking solutions, pods are able to communicate with each other. kube-proxy runs on each node in the k8s cluster and its job is to look for new services and everytime a new service is created, it creates appropriate rules on each node to forward traffic to those services to the backend pods. kube-proxy is deployed as daemonset pods in the kube-system name space in the kubeadm cluster.
+-------------------------------------------------------------------------------------------------------------------------------
+Pods: It is always not recommended to add multiple container in a single pod . But single pod can have multiple container but these containers should not be of same kind. For our intention to scale our applications, we need to create additional pods. The two containers inside pod can communicate with each other by refering to localhost as they share the same network space. Also they share the same storage space.
+pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+  labels:
+    app: nginx
+    tier: frontend
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+
+--> kubectl apply -f pod.yaml
+--> kubectl explain replicaset
+
+Imperative and declarative :
+In Infrastructure as code,in Imperative approach we give command what is required & step by step guide on how it should be done. 
+In Declarative approach, we just declare our requirements. Eg: Ansible,chef,terraform
+In K8s world we use many imperative commands like kubectl run,create, expose are called create objects & kubectl edit,scale,set etc are called update objects. These commands are one time used and forgotten(available in history) & it is hard for the users to find out how these objects were created if we use these commands.
+For declarative approach, the k8s command example is kubectl apply -f nginx.yaml 
+Creating the yaml configuration file helps in write down exactly what we need in the configuration.and use the kubectl create or apply command to create the object. We can use kubectl edit command to edit the configuration and if we open the file with edit command, we see similar type of config yaml what we had  and the status section of the pod.make changes and save file and changes will be applied to the live object.
+
+kubectl apply command:
+when we use kubectl apply command to create a object, the yaml file of our local config file is converted into json format and it is then stored as last applied configuration. Going forward for any updates to the object, all the 3 files( local file,last applied configuration,live object configuration) are compared to identify what changes are to be made on live object.
+why do we need last applied configuration?
+If a field is deleted,eg: type label was deleted,and now if we run kubectl apply command, we can see that last applied configuration had that label which is currently not present in the local configuration. This means a field needs to be removed from the live configuration. 
+If a field is present in local configuration but it is not present in last applied configuration , then it is left as it is.
+So Last applied configuration helps us figure out what fields have been removed from local file. This last applied configuration is stored inside the live object configuration in the json format as an annotation. This is only done when we use "kubectl apply" command and kubectl replace or create command will not store this last applied configuration.
+-------------------------------------------------------------------------------------------------
+Manual scheduling:
+If there are no inbuilt schedulers in the cluster, the pod will be in "pending" state. We can verify if the scheduler is present or not by
+-->  kubectl get po -n kube-system
+If we dont have inbuilt schedulers, and we want to schedule our pods manually,then we need to use the field "nodeName" in the spec section of the pod.
+eg:
+spec:
+  nodeName: node02        # node02 is the name of the node.
+
+By this pods get assigned to specified node. We can only specify the nodeName at creation time of pod. In case if pod is already created, then k8s wont allow to modify thenodeName property of existing pod. So for this we need to create a binding object and send a post request to a pod's binding api. Thus mimicing what the actual scheduler does.
+
+#pod-bind-defination.yml
+apiVersion: v1
+kind: Binding
+metadata:
+  name: nginx
+target:
+  apiVersion: v1
+  kind: Node
+  name: node02
+
+Then we need to send post request to the pod's binding api with  the data set to the biding object in json format. so we must convert the yaml file to its equivalent json form
+--> curl --header "Content-Type:application/json" --request Post --data '{"apiVersion":"v1", "kind": "Binding" ...}
+http://$SERVER/api/v1/namespaces/default/pods/$PODNAME/binding/
+
+NOTE: There is no method to move pod from one node to another, we need to delete the pod on one node and recreate it on another node
+------------------------------------------------------------------------------------------------------------------------------------------
+Daemonsets:
+
+Daemonsets runs one copy of your pods on each node in k8s cluster. Whenever new node is added to the cluster, a replica of a pod is automatically added to that node. And when a node is removed, pod is automatically removed as well. 
+Daemonset can be used as a monitoring agent, logs viewer etc. Eg: kube-proxy is deployed as a daemonset on all nodes.
+Also networking solution like weavenet requires an agent to be deployed on each node in the cluster.
+Daemonset spec file is almost similar to Deployment spec,only difference is "kind: DaemonSet" and we dont specify "replicas" field in demonsets.
+--> kubectl get ds
+Daemonset can be achieved by using "nodeName: nodexx" property. (old method)
+In New method,daemonset makes use of NodeAffinity and default scheduler rules. 
+Note: There is no create daemonset command so we need to run imperative command of deployment, dry run it to a file and make necessary changes as per daemonsets. Delete the "stratery" and status section
+----------------------------------------------------------------------------------------------------------------------------------------- 
+Static pod:
+
+For in case we dont have master node, and we have only kubelet installed in our node, to create a pod since the apiserver is not there, thr kubelet wont get information about the pods to create. For this we can keep our pod details in one directory path /etc/kubernetes/manifests. the kubelet periodically checks this path and creates the pod. It also ensures to keep the pod alive by if the pod crashed, the kubelet attempts to restart it. And if we make changes to any of the files in this directory, the kubelet attempts to recreate the pod with the new changes.And if we remove a file from this directory, the pod is deleted automatically. And these pods created without the intervention of apiserver or any other k8s cluster components are known as static pods.
+other then pods,we cannot create any other k8s objects like this.Kubelet works at a pod level.
+The path can be any and we need to mention this as --pod-manifest-path=/etc/kubernetes/manifests  (or) we can also mention --config=kubeconfig.yaml in the kubelet.service file . In the kubeconfig.yaml file, staticPodPath: /etc/kubernetes/manifests . We should know to configure this path. 
+once the static pods are created, we can view them by running --> docker ps (since we dont have kubectl now)
+The other way the kubelet gets the input is through http api endpoint. The kubelet can create static pod from both methods at the same time.
+Meanwhile api server will also be aware of static pods created by kubelet. If we run --> kubectl get pods (o/p: static-web-node01 pod is visible.)
+The name of the pod is automatically appended with node name.
+This is because when the kubelet creates the static pod, it also creates mirror object in the kube api server. It is a readonly pod and we cannot edit or delete it like usual pods. It can only be deleted by modifying nodes manifest folder.
+We can use static pods to deploy the components of control plane as pods on a node. First install kubelet on all master nodes and then create pod defination file that uses docker images of various control plane components such as apiserver, etcd etc and place this definetion file in the designated manifest folder and kubelet takes care of deploying them as pods in the cluster.
+This is why when we list pods in kube-system namespace,we see the control plane components as pods in a cluster setup by kube admin tool.
+Both the pods created by static pods and daemonsets are ignored by kube-scheduler.
+To identify the static pods in the cluster, --> kubectl get po -A
+and you will see nodename appended to it at the end (Eg: kube-apiserver-controlplane) (or) other way is 
+--> kubectl get po kube-apiserver-controlplane -n kube-system -o yaml   (go to the ownerreferences section and see kind: Node) 
+(also we can use kubectl filter and references)
+To identify the path of the directory holding the static pod definition file, --> cat /var/lib/kublet/config.yaml, here inside this we can see the staticPodPath: /etc/kubernetes/manifests
+The command to use the command option for the busybox image is 
+--> kubectl run <pod-name> --image=busybox --dry-run=client -o yaml --command -- sleep 1000
+Note: the command should come at end only after all the kubetl command ends.
+--> kubectl get po (to verify always in exam also)
+To delete the static pods, first we need to see the name of the node appended to the pod and if it is node01, 
+--> kubectl get nodes -o wide (to get the node internal ip)
+--> ssh <node-ip>
+--> cat /var/lib/kublet/config.yaml   
+get the path and remove the pod yaml file there
+exit and go to the controlplane and see the pod terminated. --> kubectl get po --watch
+---------------------------------------------------------------------------------------------------------------------------------------------
+Multiple Schedulers:
+
+We can define and deploy additional schedulers as per our custom requirements in k8s cluster. In that way all other applications can use default scheduller and some applications will use our custom scheduller. k8s cluster can have multiple schedulers at a time. while creating a pod or deployment, we can instruct to have a pod schedulled by a specific scheduler. The schedullers should have different names to identify them. The name of the default scheduler is "default-scheduler" and it is configured in scheduler-config.yml file. If we dont specify any scheduler name, default scheduler is considered. For other schedulers, we can create seperate configuration files and set the name Eg: my-scheduler-config.yaml
+
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+Profiles:
+- schedulerName: my-scheduler
+
+We can deploy it by downloading the binary and in the my-scheduler.service , we point the scheduler to the custom configuration file path that we created.
+Eg:
+--config=/etc/kubernetes/config/my-scheduler-config.yaml
+
+We know that with the kubeadm deployment, all the controlplane components run as a pod in k8s cluster. In the pod definition file, we specify as
+
+spec:
+ containers:
+  - command: 
+     - kube-scheduler
+     - --address=127.0.0.1
+     - --kubeconfig=/etc/kubernetes/scheduler.conf
+     - --config=/etc/kubernetes/my-scheduler-config.yaml
+    image: k8s.gcr.io/kube-scheduler-amd64:v1.11.3
+    name: kube-scheduler 
+
+in my-scheduler-config.yaml:-
+
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler
+leaderElection:
+  leaderElect: true
+resourceNamespace: kube-system
+resourceName: lock-object-my-scheduler
+
+The leaderElect option is used when we have multiple copy of schedulers running in different master nodes. And if multiple copies of schedulers are there, then we can have only 1 can be active at a time and we need leaderElect option.
+To deploy additional scheduler as deployment, we can refer k8s official documentation page. once we deployed, we can see our custom scheduler running as pod in the kube-system namespace. After deploying custom scheduler, we need to configure a pod or deployment to use this scheduler. That is done by specifying the schedulername in the pod spec.
+
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+  schedulerName: mys-custom-scheduler
+
+now apply this pod.yaml. If the scheduler is not configured properly, the pod will be in pending state.
+To Identify which scheduler picked up the pod, --> kubectl get events -o wide
+We can also view the logs of the schedulers by command --> kubectl logs my-custom-scheduler --name-space=kube-system
+The name of the pod that deploys default scheduler in current environment is "kube-scheduler-controlplane"
+------------------------------------------------------------------------------------------------------------------------------------------------
+Scheduler Profiles:
+We can set a priority of importance of the pod,for which first we need to create priority class,
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000
+globalDefault: false
+description: "This priority class should be used for xyz service pods only."
+-----
+pod-definition.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  priorityClassName: high-priority
+  containers:
+  - name: simple-webapp-color
+    image: simple-webapp-color
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: 10
+--------
+The pod goes through 4 phases:
+
+scheduling queue: When the pods are created, they end up in a scheduling queue. At this stage, pods are sorted based on priority defined in the pods.
+Filtering: In this phase, nodes that cannot run the pods are filtered out.
+scoring: The score is given to node based on amount of space that will remain after scheduling the pod. If more space is remaining in that node then that node will be given highest score & pod will be placed in that node.
+binding: In this phase, pod is finally bound to a node with the heighest score.
+
+All of these operations happen with the help of plugins.Some of them are prioritySort plugin for Scheduling Queue & NodeResourcesFit,NodeName,NodeUnschedulable plugins for filtering phase & NodeResourcesFit,ImageLocality plugin for scoring & DefaultBinder plugin for Binding phase.
+At each phase, there are extention points to which a plugin can be plugged to.In scheduling que it is queueSort Extention,filter extention for filtering,score extention for scoring,bind extention for binding.
+And for each phase, there is pre extention and post extention.
+There are some additional extention plugins. and some plugins span across multiple extention points.
+After k8s 1.18 release version, a feature to support multiple profiles in a single scheduler was introduced. Now we can configure multiple profiles within a single scheduler in the schedule configuration file by adding more entries to the list of profiles and for each profile specify a seperate scheduler name.
+With this multiple schedulers are run in the same binary instead of creating seperate binaries for each schedulers.
+To configure them to work differently, under each scheduler profile, we can configure the plugins the way we want to. Eg:
+
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- schedulerName: my-scheduler-2
+  plugins:
+    score:
+      disabled:
+       - name: TaintToleration
+      enabled:
+       - name: MyCustomPluginA
+       - name: MyCustomPluginB
+
+- schedulerName: my-scheduler-3
+  plugins:
+    preScore:
+      disabled:
+       - name: "*"
+    score:
+      disabled:
+       - name: '*'
+
+Note: Refer more here "https://stackoverflow.com/questions/28857993/how-does-kubernetes-scheduler-work"
+----------------------------------------------------------------------------------------------------------------------------------------
+Configure applications:
+
+Configuring applications comprises of understanding the following concepts:
+(1)Configuring Command and Arguments on applications
+(2)Configuring Environment Variables
+(3)Configuring Secrets
+---------------------------------------------------------------------------------------------------------------------------------------

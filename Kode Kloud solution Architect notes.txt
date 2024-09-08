@@ -629,8 +629,118 @@ Problem arises when te EC2 instance goes down and come back on another host-2. S
 ---------------------------------------
 Demo: Instance store Volumes
 
+go to EC2 --> launch instance --> not all ec2 instance type support instance store so choose m5dn.large --> choose key pair --> under volume section, we get instance store volume,we get volume2 with size 75GB and device name /dev/nvme0n1 --> enable public ip --> launch instance
+Login to the instance and do lsblk to see the attached volumes (o/p: we can see / and nvme1n1)
+--> sudo file -s /dev/nvme1n1
+--> sudo mkfs -t xfs /dev/nvme1n1
+--> sudo mkdir /instance-demo
+--> sudo mount /dev/nvme1n1 /instance-demo
+--> df -kh
+--> cd /instance-demo
+create a file with text
+Now ec2 instance moving to other physical host doesnt mean that after reeboot the instance will move to otherhost,it will still be in same host. 
+Test it by rebooting but you can still see the same public ip for the instance. Thats how we know if our ec2 has moved to different physical host or not. 
+Again login to instance and run mount command again and we can see the file we created.
 
+This time stop the instance and later start it and the public ip will change. Now our instance has moved to different host. Now it is going to get the brand new instance store volume as old one was in the other physical host. Now login to this instance
+--> lsblk  (o/p: nvme1n1 is still attached)
+--> sudo file -s /dev/nvme1n1  (o/p: /dev/nvme1n1: data)
+This means all the data is gone as there is no file system
 
+Remember that instance store volumes are not ment for data that persists. It is only for temporary data.
+--------------------------------------------
+EFS (Elastic File System)
 
+There are 2 types of file system provided by AWS
+1. AWS EFS
+2. AWS FSx
 
+EFS uses network file system v4 protocol NFSv4. Any application using this protocol can work with AWS EFS. With EFS we create a file system and EC2 instances and other computer services can remotely connect to that file system and mount them.
+EFS only works with only linux. With EFS file system, data can be shared across multiple EC2 instances at the same time.
+To create EFS , we deploy it onto VPC (EFS is VPC specific). Then inside VPC,it is made available to AZ using mount target and once they are deployed into subnets they get IP address. eg. 10.0.1.10  
+EC2 instances can then connect to the file system by specifying the IP address of the mount target. For high availability, we can have mount targets in multiple az (eg. 10.0.2.10 in az2).  
+EFS offers following storage classes. 
+1. Standard storage classes like EFS Standard and EFS standard-Infrequent Access (Standard-IA). They have multi-AZ resilience and the highest levels of durability and availability.  
+2. One zone storage classes like EFS One-zone and EFS One Zone-Infrequent Access (EFS One Zone-IA). The choice of additional savings by choosing to save your data in a single Availability Zone.
 
+EFS also provides different performance modes that handle different throughput,Iops,low latency needed for a broad range of workloads.
+1. General Purpose Performance Mode: suitable for latancy-senstive applications like web-serving environments,content-management systems,Home directories,General file serving.
+2. Elastic throughput Mode: Automatically Scale Throughput performance up or down to meet the needs of your workload activity.
+3. Max I/O Performance Mode: Higher levels of aggregate throughput and operations per second. They have higher latency for file system operations. 
+4. Provisioned throughput mode: Level of throughput the file system can drive independent of the file system's size or burst credit balance. 
+5. Bursting throughput mode: Scales with the amount of storage in your file system and supports bursting to higher levels for up to 12 hours per day. 
+
+Installing amazon-efs-utils
+--> sudo yum install amazon-efs-utils -y
+--> sudo mount.efs efs:id /directory
+The efs:id is the ID of the efs filesystem and can be found in the AWS console. /directory-select which directory you would like to mount the filesystem at
+ 
+EFS can be mounted but cannot be booted, can't install an operting system. This is the difference between EFS and EBS volumes
+-------------------------------------
+Demo: EFS
+
+Create 2 instances in 2 different AZs US-east-1a and US-east-1b . Now lets create a managed EFS and mount it on to both of these servers. They can both be reading and writing to it at the same time. 
+Goto EFS --> create file system --> customize --> name: efsdemo --> standard --> Enable automatic backup --> life cycle management -> tarnsition into IA: 30 days since last access --> enable encryption at rest --> throughput mode: Enhanced --> Next --> choose vpc --> select AZs and our efs security group we created (to allow traffic from the sg of our instances) and it will automatically configure mount targets (it is good to have mount targets in all AZ for redundancy) --> create olicy if u want --> create
+Now our EFS file system is ready and login to both servers, 
+--> sudo mkdir /efsdemo   (in both servers)
+--> sudo yum install amazon-efs-utils -y (in both servers)
+--> sudo mount.efs fs-08d374b450987 /efsdemo    (the efs id we get from efs console) (in both servers)
+--> df -kh 
+--> cd /efsdemo
+--> sudo vi file1
+"server1 text"
+--> go to server2 and we can see the file1 there in /efsdemo path
+Similarly you can create file2 in this server and check it in server-1
+
+You can also configure fstab for this
+----------------------------------------
+FSx:
+
+FSx is a fully managed service that provides high performance file storage for wide range of workloads designed to easier for businesses and organizations.
+EFS only works with linux. If we have windows based m/c,we should use FSx. 
+
+FSx will provide below features:
+* Provisioning file servers and storage volumes
+* Replicaing data
+* Patching file server
+* Addressing hardware issues
+* Performing manual backups.
+
+Fsx-Benefits
+* storage (store files,docs,photos,videos)
+* managed
+* Scalable
+* shared access
+* Backups
+
+Different Flavors of FSx
+1. Amazon FSx for Windows file server.
+   * It supports the server message Block (SMB) protocol
+   * You can easily integrate it with Microsoft Active Directory
+   * It supports data deduplication
+   * You can set quotas
+
+2. Amazon FSx for lusture.
+   * optimized for high performance.
+   * It provides low-latency,high-throughput access to data. 
+   * It is built on the lusture file system
+   * Amazon FSx for lusture integrates seamlessly with other AWS services like Amazon S3,AWS DataSync, and AWS Batch
+   * You can easily scale the file system's apacity and throughput
+
+3. Amazon FSx for NetAPP ONTAP.
+   * It offers high-performance stprage that's accessible from linux,windows,and macOS via NFS,SMB,and iSCSI protocols
+   * It can scale your file system up or down in response to workloads demands
+   * It can perform snapshots,lones,Replications and much more
+
+4. Amazon FSx for openZFS
+   * It is built on top of the open-source OpenZFS file system
+   * It supports access from Linux,windows,and macos via industry standard NFS Protocol
+   * It utilizes power openZFS capabilities including data compression,snapshots,and data clonning
+   * It offers built-in data protection and security features.
+
+Deployment options for FSx:
+* FSx for windows,OnTap,OpenZFS supports both single-AZ and Multi-AZ deployments
+* FSx luster supports only single AZ deployment.
+-----------------------------------------
+S3 overview:
+ 
