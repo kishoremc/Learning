@@ -686,8 +686,8 @@ provider "aws" {
 
 resource "aws_instance" "myec2" {
    ami = "ami-082b5a644766e0e6f"        
-   instance_type = var.list[1]                      # for accessing map
-  #instance_type = var.types["us-west-2"]           # for accessing list
+   instance_type = var.list[1]                      # for accessing list
+  #instance_type = var.types["us-west-2"]           # for accessing maps
 }
 
 variable "list" {
@@ -816,7 +816,7 @@ locals {
 Important pointers for local values:
 1) Local values can be helpful to avoid repeating the same values or expressions multiple times in a configuration.
 2) If overused they can make a configuration hard to read by future maintainers by hiding the actual values used.
-3) use lacal values only in moderation,in situations where a single value or result is used in many places and that value is likely to be changed in future.
+3) use local values only in moderation,in situations where a single value or result is used in many places and that value is likely to be changed in future.
 --------------------------------------
 Terraform functions:
 The Terraform language includes a number of built-in functions that you can use to transform and combine values.
@@ -829,7 +829,7 @@ The terraform language does not support user-defined functions, and so only the 
 Numeric,String,Collection,Encoding,Filesystem,Date and Time,Hash and crypto,IP Network,Type Conversion.
 Within each of these functions,we have multiple sub catagories. We can see this in terraform documentation page for builtin functions. 
 In the terminal, run --> terraform console and try out these function
-Some of the sub functions of string functions are chomp,indent,join,regex,title,trim,title,split,replace etc
+Some of the sub functions of string functions are chomp,indent,join,regex,title,trim,split,replace etc
 
 Eg: functions.tf
 
@@ -881,7 +881,7 @@ output "timestamp" {
   value = local.time
 }
 -------
-* look up function will retrieves the value of a single element from a map,given its key.If the given key does not exist, a the given default value is returned instead.syntax is --> lookup(map, key, default)
+* look up function will retrieves the value of a single element from a map,given its key.If the given key does not exist,the given default value is returned instead, syntax is --> lookup(map, key, default)
 Eg:
 > lookup({a="ay", b="bee"}, "a", "what?")          # terraform console
 ay
@@ -903,11 +903,13 @@ Hello World                           # it returned the contents of hello.txt
 * formatdate function will format the date in proper format
 --> terraform apply -auto-approve.
 now we can verify this from aws console having two instances now with the respective tags assigned to them
+For an Absolute Path: If you prefer to use an absolute path, you can specify the full path to the public key file, though this approach is less portable:
+eg --> public_key = file("/absolute/path/to/id_rsa.pub")
 ------------------------------------------
 Data sources:
 Data sources allow data to be fetched or computed for use elsewhere in Terraform configuration.
 Suppose if we want to create a instance in 3 different regions, then the ami id will differ for each region. Till now we have hard coaded the ami-id. 
-So bertter option is to use data sources. Data sources are defined under the data block and they reads from specific data source (aws_ami) and exports results under "app_ami".
+So better option is to use data sources. Data sources are defined under the data block and they reads from specific data source (aws_ami) and exports results under "app_ami".
 
 Eg: data-source.tf
 
@@ -928,7 +930,7 @@ data "aws_ami" "app_ami" {
 }
 
 resource "aws_instance" "instance-1" {
-    ami = data.aws_ami.app_ami.id
+   ami = data.aws_ami.app_ami.id
    instance_type = "t2.micro"
 }
 
@@ -1023,8 +1025,8 @@ variable "iam_user" {
   default = "demouser"
 }
 
-With this if tmrw thre is new requirement to create iam user,we can add it in iam_user.tf . If new requirement for ec2, add it in ec2.tf etc
-If we have same resource local name, then terraform will give error saying that particular resource local name is already existing. Here in our example, we should no use same local name "myec2" and hence we give new local name "newec2"
+With this if tmrw there is new requirement to create iam user,we can add it in iam_user.tf . If new requirement for ec2, add it in ec2.tf etc
+If we have same resource local name, then terraform will give error saying that particular resource local name is already existing. Here in our example, we should not use same local name "myec2" and hence we give new local name "newec2"
 ---------------------------------------------------
 Dynamic Block:
 In many of the use-cases,there are repeatable nested blocks that needs to be defined.
@@ -1120,7 +1122,7 @@ The -replace option with terraform apply to force terraform to replace an object
 --> terraform apply -replace="aws_instance.web"
 Here aws_instance.web is the resource address.
 by running this command, terraform will first destroy the existing instance and then recreate the new instance with the configuration that it has.
-Use case is consider someone loged in to the instance and did some changes nd due to which our application is not working . and now if we want to revert back to the previous working condition, then we use terraform taint.
+Use case is consider someone loged in to the instance and did some changes and due to which our application is not working . and now if we want to revert back to the previous working condition, then we use terraform taint.
 Similar kind of functionality was achieved using "terraform taint" command in older versions of terraform.
 For terraform v0.15.2 and later, hashicorp recommended using the -replace option with terraform apply.
 ---------------------------------------------------
