@@ -1194,7 +1194,7 @@ Here we can also directly download graphviz software to windows and proceed.
 ----------------------------------------------------
 Saving Terraform file to a file:
 The generated terraform plan can be saved to a specific path.
-This plan can then be used with terraform apply to be certain tht only the changes shown in this plan are applied.
+This plan can then be used with terraform apply to be certain that only the changes shown in this plan are applied.
 Eg: 
 --> terraform plan -out=<file-name>
 --> terraform apply <file-name>
@@ -1224,11 +1224,11 @@ output "iam_names" {
   value = aws_iam_user.lb[*].name
 }
 
-output "iam_names" {
+output "iam_arns" {
   value = aws_iam_user.lb[*].arn
 }
 
---> terraform output iam_arn         (o/p: the values are retrieved)
+--> terraform output iam_arns         (o/p: the values are retrieved)
 --> terraform output iam_names       (o/p: the values are retrieved)
 ------------------------------------------------
 Terraform settings:
@@ -1358,7 +1358,7 @@ For production environment,it is not recommended to use these refresh and target
 -----------------------------------------------------
 Zipmap functions:
 
-The zipmap funcion constructs a map from a list of keys and a corresponding list of values.syntax is --> zipmap(keyslist, valueslist)
+The zipmap function constructs a map from a list of keys and a corresponding list of values.syntax is --> zipmap(keyslist, valueslist)
 --> terraform console
 > zipmap(["a", "b"], [1, 2])
 {
@@ -1498,7 +1498,7 @@ resource "aws_instance" "myec2" {
 
 Important pointers:
 1) This can be used as a measure of safety against the accidental replacement of objects that may be costly to reproduce,such as database instances.
-2) Since this argument must be present in configurtion for the protection to apply,note that this setting does not prevent the remote object from being destroyed if the resource block were removed from configuration entirely.
+2) Since this argument must be present in configuration for the protection to apply,note that this setting does not prevent the remote object from being destroyed if the resource block were removed from configuration entirely.
 --------------------------------------------------------
 LifeCycle- Ignore Changes Argument:
 In cases where settings of a remote object is modified by processes outside of terraform,the terraform would attempt to "fix" on the next run.
@@ -1604,7 +1604,7 @@ Eg: In terraform console
 Basics of For Each:
 for_each makes use of map/set as an index value of the created resource.
 To create 3 iam users ,instead of count and count.index, we can make use of for_each.
-If a neew element is added, it will not affect the other resources. Because in for_each, resource address is directly mapped with the element name that is added. i.e the resource address aws_iam_user.iam[user-01] is having infrastructure user-01 and similarly so on
+If a new element is added, it will not affect the other resources. Because in for_each, resource address is directly mapped with the element name that is added. i.e the resource address aws_iam_user.iam[user-01] is having infrastructure user-01 and similarly so on
 Eg:
 resource "aws_iam_user" "iam" {
   for_each = toset( ["user-01","user-02", "user-03"] )
@@ -1692,7 +1692,7 @@ resource "aws_instance" "myec2" {
 --> terraform apply -auto-approve
 --> terraform destroy -auto-approve
 
-Note: whenever we create one an instance without explicitly specifying any security group, the default security group will be applied. In that default security group, make sure ssh port 22 is allowed and also http port 80 is allowed.
+Note: whenever we create an instance without explicitly specifying any security group, the default security group will be applied. In that default security group, make sure ssh port 22 is allowed and also http port 80 is allowed.
 -------------------------------------------------
 Implementing local-exec provisioners:
 
@@ -1712,7 +1712,7 @@ resource "aws_instance" "myec2" {
 
 In the above code, once after creation of instance, the terraform will add the private ip of that instance to the private_ips.txt file which is in our current local terminal from where we executed this command.
 One of the main use of this is to run ansible playbooks in our local.
-In windows run echo and check. After execution,a file called pvt_ip is created.varify its content.
+In windows run echo and check. After execution,a file called private_ips.txt is created.verify its content.
 In local exec we dont need connection block as we are not connecting to server.
 -------------------------------------------------
 Creation-time and destroy-time provisioners:
@@ -1773,7 +1773,7 @@ resource "aws_instance" "myec2" {
 }
 
 --> terraform apply -auto-approve
-First security group is creted --> next ec2 instance is created --> provisioning remote-exec --> installs the nano package
+First security group is created --> next ec2 instance is created --> provisioning remote-exec --> installs the nano package
 --> terraform destroy -auto-approve
 Provisioning with remote exec --> removes the nano package --> destroys the server --> destroys the security group
 
@@ -1864,7 +1864,7 @@ After keeping all the files and directories as shown above in path, first we nee
 (O/p: Error: Module not installed)
 We need to install module so run --> terraform init
 (O/p: module is created.)
-The use case here is, suppose a developer nees to create a ec2 instance, then he dont need to know configurations related to ec2 instance,security group etc. All he needs to do is to call the ec2 module that the DevOps team might have created.
+The use case here is, suppose a developer needs to create a ec2 instance, then he dont need to know configurations related to ec2 instance,security group etc. All he needs to do is to call the ec2 module that the DevOps team might have created.
 Whatever changes we needs to make for the instance, we need to make it in the /modules/ec2/ec2.tf file
 ----------------------------------------------------
 Variables and terraform modules:
