@@ -2063,9 +2063,9 @@ Anyone can publish and share modules on the terraform registry. Published module
 Requirements for publishing modules are:
 GitHub -> The module must be on GitHub and must be a public repo. This is only a requirement for the public registry.
 Named -> Module repositories must use this three-part name format terraform-<PROVIDER>-<NAME>
-Repository description -> The GitHub repository description is used to populatethe short description of the module.
+Repository description -> The GitHub repository description is used to populate the short description of the module.
 Standard module structure -> The module must adhere to the standard module structure.
-x.y.z tags for releases -> The registry uses tags to identify module versions. Release tag namesmust be a semantic version,which can optionally be prefixed with a v. For example, v1.0.4 and 0.9.2
+x.y.z tags for releases -> The registry uses tags to identify module versions. Release tag names must be a semantic version,which can optionally be prefixed with a v. For example, v1.0.4 and 0.9.2
 
 Standard Module Structure:
 The standard module structure is a file and directory layout that is recommended for reusable modules distributed in seperate repositories. There are two formats,
@@ -2083,6 +2083,7 @@ Some commands are:
 --> terraform workspace new prd  -> To create a new workspace prd
 --> terraform workspace list     -> To list all workspace. *indicates the current workspace.
 --> terraform workspace select dev -> To switch between workspaces
+--> terraform workspace delete dev -> To delete workspace
 -----------------------------------------------
 Implementing terraform workspace:
 Eg: workspace.tf
@@ -2108,7 +2109,7 @@ variable "instance_type" {
   }
 }
 
-Now if you are in prd workspace and if you do terraform plan, we can see instance type as t2.large.
+Now if you are in prod workspace and if you do terraform plan, we can see instance type as t2.large.
 --> terraform workspace select dev
 --> terraform plan      (o/p: t2.micro)
 --> terraform apply -auto-approve
@@ -2122,7 +2123,7 @@ For default workspace, the terraform.tfstate file will be created in root direct
 Remote state management:
 
 Integrating with git for team management:
-Currently we have been working with terraform code locally. It is not a good option because someone might delete it and also it cannot be used for collaboration. Other person in the team would not be avle to access it if code is in local. For this reason we should have central repository (GIT).
+Currently we have been working with terraform code locally. It is not a good option because someone might delete it and also it cannot be used for collaboration. Other person in the team would not be able to access it if code is in local. For this reason we should have central repository (GIT).
 Create a repository in github or bitbucket. install git bash for windows. Clone the repository, --> git clone <repo-path>
 create 2 files providers.tf and rds.tf and add below contents
 
@@ -2149,7 +2150,7 @@ resource "aws_db_instance" "default" {
 --> git config --global user.email <your-email>
 --> git add .
 --> git commit -m "my first git commit"
---. git push origin master
+--> git push origin master
 -------------------------------------------------------------
 Security challenges in committing TFstate to git:
 It is very important that we should never store passwords,api keys or any kind of secrets within the git repo. 
@@ -2253,18 +2254,19 @@ Now we cant see statefile in our local folder. It is in the s3 bucket inside net
 State file locking:
 Whenever you are performing write operation,terraform would lock the state file.
 This is very important as otherwise during your ongoing terraform apply operations, if others also try for the same,it can corrupt your statefile. 
---> terraform plan
-(o/p: Error acquiring the state lock)
+
 Eg: sleep.tf
 resource "time_sleep" "wait_300_seconds" {
   create_duration = "300s"
 }
+
 --> terraform plan
+(o/p: Error acquiring the state lock)
 --> terraform apply -auto-approve          (o/p: now it is sleeping for 5 min)
 Now in the other terminal,if you do -> terraform plan  (o/p: Error acquiring the state lock)
 This is because whenever we do terraform apply, automatially ".terraform.tfstate.lock.info" file will be created. Through this specific file, terraform will know there is ongoing operation that is happening on statefile.
 If we open this file,we can see lock ID,user info,creation date,path of terraform.tfstatefile etc.
-Once the terraform operations have been completed, this lock file will be automatically removed. And once it is removed, other user can berform write operations.
+Once the terraform operations have been completed, this lock file will be automatically removed. And once it is removed, other user can perform write operations.
 Important notes:
 State locking happens automatically on all operations that could write state. You won't see any message that it is happening.
 If state locking fails, terraform will not continue.
@@ -2306,7 +2308,7 @@ If we want to store current configuration with no changes to the state,use "terr
 --> terraform apply -auto-approve
 (o/p: Acquiring state lock...)
 Now in different terminal,if we do terraform plan (Error: Error acquiring the state lock)
-Now go to dynamodb table in the AWS --> sect ur table --> explore table items --> LockID is visible.
+Now go to dynamodb table in the AWS --> select ur table --> explore table items --> LockID is visible.
 Same information we can see on the terminal where we got lock error.
 Once the overall creation process is completed,it will show "Releasing state lock" and now in the AWS console, our LockID is visible but its associated data has been removed.
 ----------------------------------------
@@ -2504,7 +2506,7 @@ Provider configuration: Terraform provider usecase- resources in multiple region
 Till now,we have been hardcoding the aws-region parameter within the providers.tf
 This means that resources would be created in the region specified in the providers.tf file.
 Use case is suppose we want to create resource "myec201" in us-east-1 and resource "myec201" also in ap-south-1 region. And also suppose we want to create one ec2 instance in Account1 and one more ec2 instance in Account2.
-Now lets create a eip where one eip should be launched in first region and other eip should be launched in second region. For this we need to make use of alias variable. alias variable allowes us to have multiple configurations for the same provider.
+Now lets create a eip where one eip should be launched in first region and other eip should be launched in second region. For this we need to make use of alias variable. alias variable allows us to have multiple configurations for the same provider.
 Eg: provider.tf
 provider "aws" {
   region     =  "us-west-1"
@@ -2547,7 +2549,7 @@ In terraform it can be achieved by mentioning provider = "<name-of profile-to wh
 Now our eip is created in 2 accounts
 ----------------------------------------
 Sensitive Parameter:
-With organization managing their entire infrastructure in terraform,it is likely that you will see some sensitive information embedded in the ode.
+With organization managing their entire infrastructure in terraform,it is likely that you will see some sensitive information embedded in the code.
 When working with a field that contains information likely to be considered sensitive,it is best to set sensitive property on its schema to true,
 Setting the sensitive to "true" will prevent the field's values from showing up in CLI output and in Terraform Cloud.
 It will not encrypt or obsure the value in the state,however.
@@ -2600,7 +2602,7 @@ output "vault_secrets" {
 Now go to statefile and we can see db creds here
 Also vault has multiple engines,like AWS engine,which allows u to generate access key and secret key. We can tell terraform to go ahead to make use of these access and secret keys and perform some operations on AWS so that now no hardcoading is required inside terraform.
 
-NOTE: Interacting with Vault from Terraform causes any secrets that you read and write to be persisted in both Terraform's state file. This meanswe need to secure our statefile
+NOTE: Interacting with Vault from Terraform causes any secrets that you read and write to be persisted in both Terraform's statefile. This means we need to secure our statefile
 -------------------------------------------
 Dependency lock file:
 Whenever we do terraform init, we can see a file named .terraform.lock.hcl file is also created in our directory.
@@ -2629,20 +2631,20 @@ resource "aws_instance" "web" {
 }
 
 --> terraform init
-(.terraform.hcl.lock file is created inside which we can see our current downloaded provider version and constraints as we specified. Tmrw if any developer uses this .tf file of ours, it will only install the provider of the version which is currently seen in our .terraform.lock.hcl file.
+(.terraform.lock.hcl file is created inside which we can see our current downloaded provider version and constraints as we specified. Tmrw if any developer uses this .tf file of ours, it will only install the provider of the version which is currently seen in our .terraform.lock.hcl file.
 Default Behaviour:
 Q: What happens if you update the TF file with version that does not match the terraform.lock.hcl?
 A: In such case, it will give you error.
 
 Upgrading option:
-If there is a requirement to use newer or downgrade a provider,can override that behavior by adding the "-upgrade" option when you run terraform init,in which case Terraform will disregard the existing selections.
+If there is a requirement to use newer or downgrade a provider, we can override that behavior by adding the "-upgrade" option when you run terraform init,in which case Terraform will disregard the existing selections.
 --> terraform init -upgrade
 o/p: now the terraform will install the upgraded/downgraded version 4.60 
 
 Points to note:
 
 (1)When installing particular provider for the first time,Terraform will pre-populate the hashes value with any checksums that are covered by the provider developer's cryptographic signature,which usually covers all of the available packages for that provider version across all supported platforms.
-Eg: if we see terraform.lock.hcl file, along with the version,we can see hashes also and these are associated with the different platform that the provider versions are supported on. This ensures that only the exact versions get install. Incase if there is mismatch with provider plugin and overall signature, the initialization will fail.
+Eg: if we see terraform.lock.hcl file, along with the version,we can see hashes also and these are associated with the different platform that the provider versions are supported on. This ensures that only the exact versions get installed. Incase if there is mismatch with provider plugin and overall signature, the initialization will fail.
 
 (2) At present,the dependency lock file tracks only provider dependencies.
 Terraform does not remember version selections for remote modules,and so terraform will always select the newest available module version that meets the specified version constraints.
@@ -2660,7 +2662,7 @@ Also we have feature of cost estimation here where it tries to estimate the cost
 Next feature is policies where we can create sentinal policies. (Eg: policy for instance has tags or not)
 ------------------------------------------
 Creating terraform cloud account:
-Go to cloud.hashicorp.com --> try cloud for free --> create account --> confirm email address --> choose workflow type (start from scratch) --> give org name and create an organozation. Now we can go ahead and create a workspace --> choose workflow (version control workflow) --> we can integrate github/gitlab/bit bucket etc based provider. By this our terraform files will be stored in version control provider. And in our terraform cloud workspace we can go ahead and do terraform plan/apply.
+Go to cloud.hashicorp.com --> try cloud for free --> create account --> confirm email address --> choose workflow type (start from scratch) --> give org name and create an organization. Now we can go ahead and create a workspace --> choose workflow (version control workflow) --> we can integrate github/gitlab/bit bucket etc based provider. By this our terraform files will be stored in version control provider. And in our terraform cloud workspace we can go ahead and do terraform plan/apply.
 -----------------------------------------
 Creating infrastructure using terraform cloud:
 In terraform cloud,we can see offerings of terraform like "Free" where basic features are supported like state management,remote operation,pvt module registry,community support. 
@@ -2677,7 +2679,7 @@ resource "aws_instance" "myec2" {
    instance_type = "t2.micro"
 }
 
-Sign in to terraform cloud account --> workspaces --> create new work space -> version control workflow --> GitHub --> Github.com (make sure the pop up is not blocked by browser) --> Authorize terraform cloud --> only seletct repository --> choose "terraform repo" --> install -> give workspace name "demo-workspace" --> create workspace.
+Sign in to terraform cloud account --> workspaces --> create new work space -> version control workflow --> GitHub --> Github.com (make sure the pop up is not blocked by browser) --> Authorize terraform cloud --> only select repository --> choose "terraform repo" --> install -> give workspace name "demo-workspace" --> create workspace.
 Now go to variables and add env variables --> AWS_ACCESS_KEY_ID --> AWS_SECRET_ACCESS_KEY --> check the box of sensitive --> save
 If we enable sensitive, we cant see the Contents in plain text. 
 Next we can perform terraform plan operation in overview --> Actions --> start new run --> choose "plan and apply" --> start run
@@ -2713,7 +2715,7 @@ When using full remote operations,operations like terraform plan or terraform ap
 The access key and secret keys are loaded from the terraform cloud itself.
 Note: If we are making use of remote operations and we have configured resource locally, then whenever we create a workspace, we can only make use of workspace which does not have a vcs connection. In case if we are making use of vcs connection where our workspace is integrated with github and we also have our iam.tf configured in locally, it will not work.
 ERROR: Apply not allowed for workspace with vcs connection.
-The workspace that is connected to a VCS requires the VCS-driven workflow to ensure that the VCS remains the single source of truth. Either make use of workspace associated with ecs or workspace not associated with vcs at all.
+The workspace that is connected to a VCS requires the VCS-driven workflow to ensure that the VCS remains the single source of truth. Either make use of workspace associated with vcs or workspace not associated with vcs at all.
 -----------------------------------------------------
 Implementing remote backend operation:
 
@@ -2748,7 +2750,7 @@ Next we need to ensure that we are properly authenticated to terraform by runnin
 This will automatically open a web browser. If not use the link provided by terraform. --> create Api token --> copy the value --> paste it in our terminal where it asks Enter a value: --> enter
 (o/p: Welcome to Terraform cloud)
 -> terraform init
-(o/p: terraform cloud has bee successfully initialized)
+(o/p: terraform cloud has been successfully initialized)
 --> terraform plan
 (o/p: Running plan in Terraform Cloud, output will stream here.)
 It will also give a link, copy and paste it in browser, there also we can see the same output and this is streamed to our cli.
