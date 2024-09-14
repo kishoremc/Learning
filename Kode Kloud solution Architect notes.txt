@@ -744,3 +744,339 @@ Deployment options for FSx:
 -----------------------------------------
 S3 overview:
  
+Simple Storage Service is used for object storage. It provides Scalability, Data Availability,Security and Performance. (it is similar to dropbox and google drive)
+It can integrate easily with other AWS services and also we can use IAM to defile who has access to our files,modify,delete etc. S3 can also we accessed using AWS console,AWS CLI,SDK and rest API. S3 doesnt have file system in it. and also we cannot mount it to servers. 
+S3 can store log files,Media Audio/Video/Images,CI/CD Artifacts. 
+
+S3-Use Cases:
+When we as a user send request to website, the website will return the HTML file and this file will have link to images and videos which is in web server. We as a user will request the webserver or these images and webserver will fetch it for us. 
+If file sizes increases,then it will become very expensive to store these on webservers. And if we had 100s of web servers, then all webservers would need to store images/videos. This becomes problem in our traditional storage. With S3 we can solve this issue.
+Consider we have a webserver and it contails HTML files and all the other medias/videos etc are stored on S3. Now we as a user will request the server and get back the html file and it will have a url which will point to s3 and now s3 will respond with all video we want. S3 will now have responsibility of containing,storing,replicating,backing up etc for TB of data. 
+
+S3 bucket is a place or directory which stores files. We can have any number of buckets in our account. multiple bucket for single application and multiple bucket for multiple applications. 
+Objects are the files that are uploaded to S3.file is referred to as objects. An object has: key-The file name and Value-File data. Also there are many properties associated with object like VersionID,Metadata,Other information . If we enable versioning in our S3 bucket, we also have version ID associated with it. 
+S3 Buckets have a flat file structure. We cannot have nested directories (folder inside folder). It is only one folder and all files are init. But if we see in the console of s3 bucket, we can see file structure like /music/song1,/music/song2 etc but it is just a illusion. It is actually a file structure and the name of the file is /music/song1, /music/song2 etc . S3 is displaying to us in folder like structure on UI. You cannot boot or mount to S3 buckets (IMP)
+
+When we upload a file to S3, In the background AWS will store on some server only on some AZ (we cant see it). And S3 is designed for High availability and durability. It will take care of our files in server. It will have replication of our file in another server and even if it goes down, file copy will be present. It will replicate our files across multiple servers across multiple AZ.
+
+S3 bucket names must be unique globally across all aws account. whenever the new bucket is created, the name of the bucket is embeded in the unique s3 url. If another user tries to create a bucket in same name,it is going to fail because we cannot have same bucket url pointing to two different buckets.
+
+S3 restrictions:
+* S3 can handle unlimited number of objects
+* maximum size of a single file is 5 TB
+* An AWS account supports 100 buckets by default,but this number can be increased to 1000 by requesting a service limit increase. 
+----------------------------------------
+Demo: S3 basics
+
+go to s3 --> Create bucket (S3 service is global and while creating bucket we specify what region we want that bucket to be in) --> kk-demo-123 --> select region: us-east-1 --> if we have any prior bucket and we can copy existing configurations from it --> by default, for the bucket we create , all the public access are blocked --> create bucket
+select the bucket --> properties --> we can see bucket-region,ARN,tags,versioning,encryption,static website hosting,object lock,requester pay etc
+Permissions tab wil manage settings of 'who has access to this bucket,all the objects within our bucket'. by default only the creator will have access to it.--> bucket policy 
+In metrics tab, we can look at all the cloud watch metrics regarding our bucket like how much data are we using in our bucket (size), how much objects etc .
+Management tab we can define life lycle rules,replication rules, inventory configurations.
+In Access Points, where it manages access data access at scale for shared datasets in s3. (named network endpoints)
+ 
+Go to objects and upload our first file. You can drag and drop also. We have properties,permission, --> upload
+Once the object is uploaded, click on it . we can see region,size,S3 URI,ARN. If we click on object URl we can see our image. but currently it says access denied. This is because S3 is showing the url in the public end point view. If we want to see the image,on top click on Open tab.
+Create folder: food --> copy few files of your food --> upload.
+Now this is not a actual folder, we can see the s3 uri as s3://kk-demo-123/food/burger.jpg. And we can access this with object url.
+To delete file, we can select file and delete. It will be permanently gone.
+We can also move our files inside our folder by select the file and actions --> move --> paste the pull path in the destination (or browse it) --> move
+To delete the bucket, we need to first empty it and delete it.
+-------------------------------------
+S3 - Storge classes 
+Storage classes provide various level of Data access,resiliency and cost.
+All users do not access the data in the same way and also there may be chance of users paying more cost for data that is used/accessed less often.
+
+1. S3 standard storage class.
+This is the default storage class. When we upload a file to this storage class,objects are replicated along atleast 3 AZs. which means that it can handle 2 simultaneous AZ failures. 99.999999999% durability . Billed per GB per month of data stored on S3. 
+S3 standard files are immediatly accessible. It allows the files to be publicly available also. Uploading data on S3 (ingress) is free and retrieve data from S3 (egress). We are charged per GB. In S3 Standard, there is no retrival fee,no min size,no min duration.
+
+2. S3 standard-IA (Infrequent Access)
+Suaitable for Data that are not accessed frequently and they are large in size. Same like standard class, objects are replicated accross 3 AZ and can handle two simultaneous AZ failures. 99.999999999% durability . Billed per GB per month of data stored on S3. Cheaper than S3 standard. 
+Files are also immediatly accessible/available when we retrieve them. Files can be made pubilicly available. Uploading data on S3 (ingress) is free and retrieve data from S3 (egress). We are charged per GB. But every time we retrieve the data, we now have the retrieval fee. Minimum duration charge of 30 days. (i.e if we store file in it and deleted after 5 days, we still get charged for 30 days.). Alsothere is minimum size charge of 128 KB per object. (i.e even if our object is 1KB, we are charged the minimum size of 128KB per object) .  
+
+S3 One Zone-IA :
+In this type, objects are not replicated across multiple AZs and they will be stored on one AZ only. Cheaper than S3 standard and S3 Standard-IA. Files can be immediatly retrieved within mini seconds. Files can be made publicly available. Only charged for egress nad ingress is free. we have the retrieval fee. Minimum duration charge of 30 days. (i.e if we store file in it and deleted after 5 days, we still get charged for 30 days.). Also there is minimum size charge of 128 KB per object. Designed for IA data. Not required to handle AZ failure. Replication still occurs with AZ.
+
+S3 Glacier-Instant:  (Archive data)
+Low cost Option for rarely accessed data. data retrieval is within mili seconds like other storage classes. Performance same as that of S3 standard.objects stored across multiple AZ. Only charged for egress and ingress is free. has a high retrieval fee, minimum duration charge of 90 days. Also there is minimum size charge of 128 KB per object. Suitable for data not required to access frequently but when we access it ,we need it immediatly.
+
+S3 Glacier-Flexible:
+This is the first storge class where objects are not immediatly avilable. They cannot be publically accessible. cheaper than S3 standard and so on...per GB egress charge. has a retrieval fee, minimum duration charge of 90 days. Also there is minimum size charge of 40 KB per object. there are 3 options to retrieve our data. Bulk: 5-12 Hours ,Expedit: 1-5 minutes, standard: 3-5 hours. Faster you want ur data,higher will be the retrival fee. During retrieval, objects are stored inS3 standard-IA class temporarily.  
+
+S3 Glacier Deep Archive:
+Cheapest storage class where objects are not immediatly avilable. where objects are not immediatly avilable. per GB egress charge. has a retrieval fee, minimum duration charge of 180 days. Also there is minimum size charge of 40 KB per object.  there are 2 options to retrieve our data. Bulk: 48 Hours ,standard: 12 hours. Faster you want ur data,higher will be the retrival fee. During retrieval, objects are stored inS3 standard-IA class temporarily.
+
+S3 Intelligent tiering:
+* Automatically reduces storage cost by intelligently moving data to the most cost-effective access tier.
+* Apart from the cost of a storage class an object gets assigned to, all objects will also incur a monitoring/automation cost per 1000 objects. 
+--------------------------------
+Demo: Storage class
+
+Go to S3 --> create bucket 
+Upload a file --> under properties , choose one zone -IA --> upload
+To change the storage class, we can go to properties --> storage class --> edit --> save
+-----------------------------------
+S3 Versioning:
+
+Consider we have s3 bucket with 5 files. if we delete file1, it is gone forever. Also if we upload file5 that already exists, its going to be replaced. In these cases,we enable versioning.
+Versioning is enabled on buckets and not individual objects. It will be applied to all object inside the bucket. buckets can be in 3 state. Unversioned, Versioning enabled, Versioning Suspended. Once we enable versioning, we cannot disable it. Only we can suspend versioning. And later we can also re enable the suspended version. (IMP)
+
+How versioning works?
+When we upload the object to the bucket to which versioning is enabled, S3 will give a version ID to it version ID-1 (long unique string). Incase we upload new object with same name/key ,instead of replacing it, its going to create a new version version ID-2. New object will have version ID-3. The newest version of object is called latest or current version. This is the version the user will see. 
+If versioning is disabled,the version ID of files will be set to NULL.
+When we delete the object with versioning enabled, Delete Marker will be added. This is the new version of that object which will not delete anything. It just looks like the object was deleted. All previous versions of object will be hided. Now if we want to undo this, we need to delete the delete marker and now we can see the current version of the object.
+If we specify the specific version ID when we delete the object, like file1.txt with version ID 2, it will permanently delete that version. 
+
+Versioning Pricing: 
+We are charged for all versions of objects stored in our bucket. Consider we have file1.txt with version1 of 10GB abd Version2 of 15 GB, then we will be charged for 25 GB. 
+
+Version Suspending:
+When we suspend versioning, all of the version of that object will remain and it wont be deleted automatically. Next if we upload new object (eg. test.txt), then it will be assigned the version ID of NULL. If we now again upload new version of file1.txt , it will have the version ID of NULL. Again uploading the same file will going to replace old file. 
+
+MFA delete:
+This is a nob/checkbox for versioning. When this feature is enabled, MFA is required to change the versioning state of the bucket. Its like extra security. MFA is required to delete versions and can only be enabled using CLI.
+----------------------------------------
+Demo: Versioning:
+
+Go to S3 and create bucket and keep the versioning disabled now. upload a file (This is version1). Now delete that file we uploaded. Now trhe file is gone.
+upload the file again. now make some changes to the file in ur local (This is version2). And now upload the file again. After uploading, try to opn it and you can see the version2 content.  Our fole is over written. Now delete this file1.txt.
+Now go to properties and enable versioning. Now again upload file1 with content "this is version1". once we have uploaded, we can see "show version" button. 
+Now lets upload the file1 with version2 content. Now if we go to bucket and enable "show version", we can see file1 two times with versionID and time stamps. We can verify by opening them. similarly upload the version3 of that file1. Now we can see 3 versions of same file1.
+Now lets delete file (it will not ask permanently delete). Now we cant see any object in our bucket. But we need to enable show version. A new file1 came with the delete marker. 
+Now in order to get our file back, we need to delete (permanently delete) the delete marker. Now we can go back and see our file.
+We can also select the specific version and delete it (permanently delete).
+Now lets see how to suspend the version. go to properties --> edit versioning -->  we see Suspend option --> save.
+Now our object will remain as they are. now lets upload the file1 with version4 text. Now we can see file1 at top of otherversion but its version ID is null. now if we upload the version5 of the file1, now the version4 file has been replaced. We can go ahead and delete the verions manually.
+Now lets upload new file2 with text "This is version1". File2 has versionID of null. upload the new file2 with version2 text and it will override it.
+
+MFA Delete:
+Now go to properties and edit versioning and we can see Multifactor Authentication. We can enable/disable this on AWS CLI only. 
+------------------------------------
+S3 Bucket Policies (ACL and Resource Policies):
+When we create a bucket, it is only accessible for that user and also root user. SO now users from AWS account or different AWS account or public anonymous user wont be able to access it.
+Resource Policy Determines who has access to an S3 resource.
+S3 Bucket Policy Determines who can have access to the bucket and what Operations they can perform.
+Eg: 
+To allow Johndoe to specific bucket
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Sid": "AllowGetObjectForJohndoe",
+      "Principal": {
+        "AWS": "arn:aws:iam::111122223333:user/Johndoe"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::your-bucket-name/*"
+    }
+  ]
+}
+---
+To allow all but deny DaisyM
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowAllGetObject",
+      "Effect": "Allow",
+      "Principal": "*",                    # apply to all users
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::your-bucket-name/*"
+    },
+    {
+      "Sid": "DenyDaisyMGetObject",
+      "Effect": "Deny",
+      "Principal": {
+        "AWS": "arn:aws:iam::111122223333:user/DaisyM"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::your-bucket-name/*"
+    }
+  ]
+}
+---
+Daisy user to access files in specific bucket path
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowDaisyMGetObjectInMediaPrefix",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::111122223333:user/DaisyM"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::EXAMPLE-BUCKET/media/*"
+    }
+  ]
+}
+---
+Policy to grant access to the bucket for the people IP in specific subnet range
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowAccessFromSpecificIPRange",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::EXAMPLE-BUCKET",
+        "arn:aws:s3:::EXAMPLE-BUCKET/*"
+      ],
+      "Condition": {
+        "IpAddress": {
+          "aws:SourceIp": "192.0.2.0/24"
+        }
+      }
+    }
+  ]
+}
+---
+To give access to specific folders in bucket
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowAccessToSpecificFolders",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::EXAMPLE-BUCKET/audio/*",
+        "arn:aws:s3:::EXAMPLE-BUCKET/video/*"
+      ],
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "audio/*",
+            "video/*"
+          ]
+        }
+      }
+    }
+  ]
+}
+---
+Block Public User: Policy to access bucket to only the users present in AWS account.
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowPublicAccessToBucket",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::EXAMPLE-BUCKET/*"
+    }
+  ]
+}
+
+But above policy will make all the public also to access out bucket, for this purpose ,AWS introduced "Block all Public Access" . Untill we uncheck this option in AWS console, whatever the policy we define will not allow public to access our bucket.
+Now even if we disable that nob, resource policy is the only thing that will expose the bucket to public. 
+
+IAM Policies VS resource policies:
+* IAM policies can only be applied to authenticated AWS users. Cannot be applied to anonymous users.
+* Since the resource policy is applied to the resource,rules can be added for anonymous/public users. (eg. s3 bucket,EC2 instance)
+
+IAM policy and Resource policy work together. if a user want to access a bucket, both iam and resource policy should not deny him anywhere.both should allow him.
+
+S3 ACLs:
+ACLs are legacy access control mechanism that predates IAM. AWS does not recommend to use it to users. ACLs are inflexible and provide only a limited set of rules. They cannot be applied to group of objects.
+
+If there is any issue for the user to access any bucket, check his/her iam policy.
+-----------------------------------
+Demo: ACL and Resource policies.
+
+Create 3 users , account1 create user1,account 1 create user2 and in account 2 create user 1.
+as user1, create a demo s3 bucket.(disable ACLs and use block public access.) 
+Once the bucket is created, upload some files in it. 
+Now try to open the file as same user & you can open but object url is denied as expected. Go to IAM policy and check that user2 is allowed to list bucket.
+lets see if another user from same account has access to this bucket. user2 can only list out the content of bucket. He cannot open file which user1 uploaded.
+Now lets setup policy that allows user2 to have access to only logs folder.
+As user1 goto permisions --> edit bucket policy --> you can use policy generator or use the wizard given on right side to get the default template --> 
+create a policy with get object for s3 bucket for logs folder ,with sid any name u want,resource as our bucket-arn/log/* , Action as s3getobject ,principal as the user2 ARN. --> create   (you can also make use of right wizard for policy)
+Now as user2, go to s3 and check your access. we can only access files in logs folder and restricted for other folders. Now lets give access to user to delete any file in traces folder. Actions: deleteobject ,Resource: bucket-arn/trace/* --> save
+Now we can delete file in trace folder.
+Note: If we are using 2 actions as a list like s3getobject and s3deletebucket, we need to pass 2 resources aswell like  ["bucket-arn/log/*", "bucket-arn"].
+Next inorder to make access of our object url to public, as a user1, go to bucket policy and add more policy with principal: *,actions: s3getobjects, sid: allowpublic,resource: bucketarn/media/* -->save
+But inorder to disable this, first we need to uncheck the block all public access.Now this allows us to define a policy that allows public access to bucket.
+Now go to media folder and access the objecturl.
+Next lets create policy to allow user from different account to access this bucket.
+Loginto another aws account as user1 and open cloud shell 
+--> aws s3 ls 
+--> aws s3 ls s3://kk-resource-policies       (# o/p: error)
+Now come to aws account1 and add new statement for our bucket policy with principal: <paste-arn-of-user1-from-account-2>,Effect : Allow, Actions: ["s3listbucket","s3DeleteObject"] --> Resource: ["bucket-arn/log/*", "bucket-arn"] . 
+Now in the cloudshell, --> aws s3 ls s3://kk-resource-policies   (#o/p: we can see contents)
+--> aws s3 rm s3://kk-resource-policies/file1.txt  (# access denied)
+--> aws s3 rm s3://kk-resource-policies/logs/log1   (# log1 deleted)
+-------------------------------------
+S3-Static Website hosting
+
+The way the website works is we as a user will send HTTP GET request to webserver and webserver will respond with an HTML file. 
+Note: Website is nothing but html file that the webbrowser renders onto screen. 
+The components that makeup the website is 
+1. html file : Structure/content of the website
+2. css file : Adds colors and provides visual elements
+3. Javascript : Adds dynamic functionality
+4. Images/videos/audio
+
+All the above things can be stored in S3 bucket. S3 has a Knob that allows to host html,css,js files on a bucket. This allows access to website files through HTTP. S3 will give the URL through which you can access the website.
+NOTE: It is only used for static Websites. If our webside needs any server side logic, then we need to deploy it in EC2,EKS,ECS,lambda etc
+To customize a domain for your website,the bucket must follow a specific format
+
+Pricing:
+Price/GB (storage) & price/GB (egress) . Also we should pay per request sent to this static site. 0.0004$ for every 1000 get request in S3 standard SC.
+
+Custom Domain name:
+once we host our static website, we get a url in format http://bucketname.s3-website-<region-name>.amazonaws.com . To use a custom domain name, use route53 . If the domain name we have is http://bestcars.com ,then our bucket name should also be bestcars.com .
+--------------------------------------
+Demo: S3-Static website hosting.
+
+gather all required files like index.html,index.css,404.html and all images we want and keep all these at one place.
+go to S3 and create a bucket "kk-static-demo". Upload all the website files to this. Now go to properties --> static website hosting --> edit --> enable --> host a static website --> Index document : index.html --> Error document: 404.html --> save
+Now we get a url for static website hosting . If we click it, we see access denied. 
+Lets setup resource policy. first uncheck block public access --> come to bucket policy and create -->principal : *, Effect: Allow , Action: s3getobject , resource: arn-bucket/* --> save  (Now we can see publicly accessible)
+
+Now try to access the static url and we can see our website. we no need to specify url/index.html here this is because we setup index file. Now enter url/jnscns and we can see 404 page not found
+-------------------------------------
+S3 - Pre signed Urls:
+
+Consider we have a private bucket in Aws account. me as a authenticated user, i can access this bucket,upload objects etc. Suppose there are couple of files in this account and we need to share it with someone who doesn't have any aws account and he is a public user. To share those files with the user, 
+(1) We can create this user and give access key,secret key (but this is not correct in security point of view). And if there re multiple people,this become hectic. 
+(2) To make bucket public. (all public users will have access but we want only couple of users to access this)
+
+This is where pre signed urls come in handy. We as an autherticated IAM user,we can create a pre signed url for our bucket. We send s3 the request and s3 will give us the pre signed url. And this url we can share it to public who needs access to an object. Now when the user sends back the request to object in bucket, S3 will think that as we(the authenticated user). Now other public cant access this bucket as they dont have url. 
+
+Pre signed url use case:
+(1) Consider we have server that contains 1000GB of video ideally in s3 bucket. We as a customer can send request to webserver  and webserver can generate pre signed url as a specific user who has access to the video "userx". Server can send that pre signed url as userx and now we can send the request to s3 bucket which will look like we are user x and now we can watch those videos. 
+Presigned urls can also be used for uploading objects to s3 bucket as well.
+(2) Consider we have some account on website and we want to update our profile pic. We have a webserver with api and we have S3 bucket which stores all the profile pics of users. When we want to upload a profile pic, we will first send our profile pic to api and api server will send it to s3 bucket.
+Note: This requires all files to traverse through back-end servers. We now may need to cutoff this middle men. Thsi is where we can use s3 presigned url . Where user can send request to API server and API server can generate pre signed url that will allow user to upload a file to bucket. Then user is able to upload a file directly to bucket. 
+
+NOTE: 
+1. When creating pre-signed URLs, an expiration date must be provided.
+2. Expiration duration of maximum 7 days using an IAM user is provided
+3. If an IAM user does not have access to S3 bucket, a pre-signed URL can still be generated using that ccount.
+4. The pre-signed IRL does not give you access to a bucket;however,it allows you to send arequest to S3 as that user that generated the URL.
+
+Consider we have a IAM user who doesn't have access to S3 bucket, If this user creates a presigned url and sends it to another user and that user tries to send that request to the s3 bucket, he will be denied.
+------------------------------------
+Demo: S3-Pre-signed-Url:
+
+Create a bucket kk-pre-signed-demo --> upload a image --> upload
+Click on the image --> object actions --> share with a pre signed url --> enter time period: 30 min --> create presigned url --> copy the pre signed url --> paste it in browser and we can see the image. Now anybody who has access to this url can access this for 30 min. Most of the time we use AWS SDK or CLI to create presigned url. 
+Now consider we have user2 and he has bucket policy to only list the bucket and object inside it. but now this user can also generate pre signed url for himself but it wont work. 
+after login in as that user2, go to object properties --> object actions --> generate pre signed url --> period: 30 min --> create
+copy it and paste it in browser and it says access denied.
+----------------------------------
+S3 -Access points:
+
+
+ 
