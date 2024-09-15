@@ -1,6 +1,6 @@
 Kode Kloud solution Architect notes:
 
-Services: Networking
+**** Services: Networking
 
 VPC: (Virtual Private Cloud)
 It is a secured,isolated network segment hosted within AWS.
@@ -503,7 +503,7 @@ Consider we have our active application in us-east-1 region with lb and ec2 (thi
 We can setup Application Recovery Controller to do readiness checks to monitor the readiness of the standby deployment.
 * Routing Control allows you to manually failover entire application stack to standby site. And finally Route53 will do the failover.
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
-Services: Storage
+**** Services: Storage
 
 Elastic Block storage (EBS):
 Block storage breaks up data into blocks and then store these blocks as seperate pieces each with a unique identifier. And these blocks can then we stored across number of physical devices. A collection of blocks can be presented to you OS as a volume.Then we can create File system on top of it. We can also present it as a hard drive which allows us to install OS on it to boot up.
@@ -836,6 +836,9 @@ When we suspend versioning, all of the version of that object will remain and it
 
 MFA delete:
 This is a nob/checkbox for versioning. When this feature is enabled, MFA is required to change the versioning state of the bucket. Its like extra security. MFA is required to delete versions and can only be enabled using CLI.
+
+S3 Versioning protects S3 objects from being accidentally deleted or overwritten by keeping multiple versions of an object in the same bucket. S3 Object Lock can help prevent objects from being deleted or overwritten for a fixed amount of time, or indefinitely.For a company that needs to comply with regulatory requirements that require them to prevent object deletion or modification for a fixed period.(IMP)
+
 ----------------------------------------
 Demo: Versioning:
 
@@ -1078,5 +1081,268 @@ copy it and paste it in browser and it says access denied.
 ----------------------------------
 S3 -Access points:
 
+Consider we have a bucket and all developers,admin,infra,legal groups etc want to access it as they are developing something.They all have seperate policies for them.And now if we create bucket policy it will be very complex.
+For addressing this, we can create a access point and each one of these group get their own access points. Through access points, they get their own little view/tunnel into the bucket. Svery access point gives its own unique ARN. And now developers who want access to this bucket will point to the ARN of the Access point which operates like a kind of S3 bucket. Great point of having acces point is we can define access policies on each of the access points.
 
- 
+Access point Restricting VPCs:
+One more benifit is suppose we have a bucket and we want to restricts its access to only users from specific vpc, then we can do this by using access points and VPC end points where we can define certain rules to allow only traffic from certain vpc to our bucket.
+
+When we define access policy, we need to define it on both access point and bucket policy. Same policy needs to be copied to bucket policy. Instead we can define the policy on bucket to deligate policies to access point.
+-----------------------------------
+Demo: Access Points
+
+Create a bucket kk-access-points . Upload one demo image.
+Create 3 users user1,user2,user3 all in same account. Login to cloud shell of user2 and user3 and check if they have access to our bucket. And they dont.
+Go to user1 and create a access point for our bucket. in the left hamburger menu. name: developer --> choose bucket in this account: kk-access-points --> Network origin: VPC or internet (choose) --> skip the policy for now and create
+similarly create one more access point and name it finance
+Go to s3 documentation and under configuring IAM policy, we can get access point policy examples. The access point policy looks almost similar to bucket policy but in the Resource section, we can see it doesn't points to S3 bucket instead it points to access point policy.
+Now instead of copying same policy to bucket policy everytime, we can instead delegate access control to the bucket to the access point.
+* bucket policy that delegate access control to the access point
+{
+    "Version": "2012-10-17",
+    "Statement" : [
+    {
+        "Effect": "Allow",
+        "Principal" : { "AWS": "*" },
+        "Action" : "*",
+        "Resource" : [ "Bucket ARN", "Bucket ARN/*"],
+        "Condition": {
+            "StringEquals" : { "s3:DataAccessPointAccount" : "Bucket owner's account ID" }
+        }
+    }]
+} 
+---
+copy paste above policy to bucket policy of ur bucket. and save it.
+Next come to access point of developers and add the below policy to it to allow user2
+{
+    "Version":"2012-10-17",
+    "Statement": [
+    {
+        "Effect": "Allow",
+        "Principal": {
+            "AWS": "arn:aws:iam::123456789012:user/user2"
+        },
+        "Action": ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
+        "Resource": ["arn:aws:s3:us-west-2:123456789012:accesspoint/developers/object/*"  
+                            "arn:aws:s3:us-west-2:123456789012:accesspoint/developers" ]   # mandatory to add "object" for ARN
+    }]
+}
+---
+Now user2 should be able to perform these operations using Access point
+Now grab the ARN of the access point, login to cloudshell
+--> aws s3 ls s3://<arn-of-access-point>    (#o/p: beach.jpg) 
+to copy it to our local
+--> aws s3 cp s3://<arn-of-access-point> .
+--> ls                (#o/p: beach.jpg)
+Now this access point url is reserved for our developers. copy the same policy and paste it in Finance access point and chane all necessary things accordingly.
+{
+    "Version":"2012-10-17",
+    "Statement": [
+    {
+        "Effect": "Allow",
+        "Principal": {
+            "AWS": "arn:aws:iam::123456789012:user/user3"
+        },
+        "Action": ["s3:GetObject", "s3:PutObject", "s3:ListBucket"],
+        "Resource": ["arn:aws:s3:us-west-2:123456789012:accesspoint/finance/object/*"  
+                            "arn:aws:s3:us-west-2:123456789012:accesspoint/finance" ]   # mandatory to add "object" for ARN
+    }]
+}
+---
+Now copy the arn of "finance access point". and in cloud shell
+--> aws s3 ls s3://<arn-of-access-point>
+--> aws s3 cp s3://<arn-of-access-point> .
+--> ls         (# beach.jpg)
+--> touch test1
+--> aws s3 cp test1 s3://<arn-of-access-point-of-finance>   # copying from local to finance access point
+--> aws s3 ls s3://<arn-of-access-point>   (# o/p: beach.jpg test1)
+Like this we can interect using accesspoint of bucket
+--------------------------------------------
+AWS Backup:
+
+Disaster recovery is the process of planning for and responding to events that could cause data loss or system downtime. Disasters can be natural or man made.
+Importance of disaster recovery:
+Downtime | Data loss, finalcial loss,Damage to reputation and legal issues.
+Solid Disaster recovery Plan:
+Business Continuity,Minimize Downtime and safeguard data integrety.
+
+Backup vs disaster recovery:
+* Backup creates copies of data to restore it in case of data loss. It is an essential part of disaster recovery.
+* Disaster recovery Encompasses a broader stratergy,including backup. It includes planning for system and application recovery
+
+AWS disaster recovery services are designed to be flexible, scalable and cost effective.
+* S3 for disaster recovery:
+S3 provides scalable,durable,highly available solutions. S3 offers 99.999999999% of data durability, it is abl to withstand the loss of multiple data centers, replicate data across Multiple AWS availability zones.
+* EBS Snapshots for disaster recovery:
+Point-in-time copies,EC2 instance and data protection.
+Manually or automated on a schedule, saving storage costs,New EBS volumes for recovery.
+AWS Backup is a service that makes it easy to centralize or automate the backup of data across aws services and resources.
+We get, 
+* Single,unified console for managing AWS services,
+* Automates backup scheduling and retention policies
+* Different regions and different accounts
+
+Basic components and features:
+there are 3 components 
+-> Backup vault: its a folder which stores our backup data. We can have multiple vaults across regions
+-> Backup plan : Defines the configuration for our backup. like schedules,retention policies, backup vault to be used etc
+-> Recovery Point: Point in time in which data can be restored.
+
+Consider in us-east-1a, our app is deployed, in which there are 2 ec2 instances,EBS,EFS,RDS. To use AWS backup, we first need to create a backup plan and as well as backup vault which is in same AZ. In backup plan we define that we want to store all our resources in app1 and send it to vault. We can also define scheduling for our backups. Now we can also create a backup vault in another region/another AWS account and we can copy the backups here. And now we can perform recovery of data loss of app1 to either region. 
+
+Basic integretions with other services:
+AWS backup support various different resource types.
+AWS backup - monitoring integrations like AWS organizations, AWS event bridge,AWS  cloud trail and AWS SNS.
+--------------------------------------------
+Elastic Disaster recovery:
+
+It is a fully managed service that provides fast,reliable recovery of on premesis and cloud applications using affordable storage,Minimal compute and point-in-time recovery. Also It offers to use AWS as a recovery site, Keep things in a continual replication state,easy to access with a disaster recovery infrastructure.
+We have to tell AWS to failover to all the data that we have backed up and it will all be done within no time and now all the traffic goes to disaster recovery site. We can use Elastic disaster recovery to recover data from On-Premise to AWS, From other cloud patforms (GCP,Azure) to AWS, From one AWS region to another.
+
+How DRS works?
+First we need to define what services to be monitored for failover and they are called as source servers. And for all of these source servers, we need to be able to replicate data in AWS cloud and for this we need to intall AWS replication Agent. Next we need to define where is our staging Area. Staging Area is a subnet where ec2 instances are deployed so that they can receive the replicated data from  source servers. 
+There will be 3 different components, on prem env,staging area and subnet to failover. The recovery servers are the services that we failover to during disaster.
+Now finally we have to define the launch settings which is the ec2 settings for your recovery servers.here we specify specifications/locations,Instance/size,region/subnet and Security Groups
+----------------------------
+Storage Gateway:
+It is the hybrid cloud storage service. It acts as a bridge between our on prem env and our cloud based storage allowing us to seamlessly integrate on prem applications with cloud storage resources.
+Storage gateway can be used for following purposes:
+* An extension for your on-premises Storage needs
+* Assists migration into the coud
+* Backups
+* Disaster recovery
+
+Storage gateway can be either a virtual machine or a physical unit that we can deploy on our on prem datacenter. SG comes in 3 types volume,file and tape. It depends on what kind of storage technology (EBS,nfs) we are using in our on prem env. 
+
+Storage gateway- Volume:
+two types -> cached mode and stored mode
+
+in volume stored mode,consider we have on prem datacenter and we have bunch of servers in it. And these servers connect to network attached storage using iscsi protocol. We can created a file system on top of this network attached storage. 
+Businesses will ideally like to have some backups to store data as well as for disaster recovery. Implementing disaster recovery in on prem becomes changelling. For this purpose we can make use of storage gateway. Once SG is deployed , we can use SG to assist us to take backup and disaster recovery. In Stored mode, the gateway appliance presents storage volumes for physical servers using iSCSI protocol. Now the physical storage will think that the storage gateway is also some type of network attached storage which they can create file system on top.
+Note that in volume stored mode, the volumes that are presented to servers are all consume capacity on prem. Meaning that the storage gateway has physical drives attached to it. Once the data is written to the disk, the storge gateway will copy the data to AWS via storage gateway end point and then the data is copied to S3 as EBS snapshots. with those snapshots, we can create new volume and attach it to EC2 instance and get complete replica of on prem environment.
+
+Points to be noted:
+* Data is stored locally on-prem. Stored on physical disks that is attached to the storage gateway on prem.(IMP)
+* Data is replicated asynchronously to AWS S3.
+* Provides convenient backup of data
+* Assists with disaster recovery. (create EBS volumes from snapshots)
+* Doesn't increase datacenter storage capacity. (All data is still stored on-prem,only backups are stored in AWS)
+
+Storage Gateway - Volume cached mode:
+We will have same setup as that of stored mode,where we have deployed storage gateway on prem environment and we are presenting block storage to the main servers connected through iSCSI. But only difference in casched mode is unlike stored mode, we dont actually store data locally. All data are stored in Aws in S3. It will look like it is stored on prem in perspective of servers.We will have local cached storage in on premise environment which handles files that are accessed frequently. Now since all data is stored in cloud, it helps us to extend the overall size of storage solution and infinetly scale up. 
+
+Points to be noted:
+* Data is stored on S3
+* Only data on-prem is cached data, for frequently accessed data.
+* Cached mode acts as a datacenter extension increases customers storage capacity.
+
+Storage Gateway - File:
+In this type, in on prem, Servers will connect to file system by using a protocol  like NFS/SMB. It is going to deploy a virtual machine/physical server into the on prem env. And final storage gateway will present itself as file system storage that servers can connect to using SMB. Servers can now write to storage gateway and any of the created files are not stored locally and instead it will go and store to AWS s3 (eg. /media/pic1.jpg). This acts like extention to our data center so that we can infinetly scale up.
+
+Points to be noted:
+* Stored in S3
+* Only data on-prem is cached, for frequently accessed data. 
+
+Storage Gateway - Tape:
+
+In this type, the servers connect to tape using iSCSI protocol. This will perform secure back up of data in a tape. We deploy our storage gateway on prem and it will present like a tape backup and the data will be emulated as tape drive.
+Whenever we are go to create backup, it will store it in AWS S3. It will store in VTL (Virtual Tape Library) which is running in S3 bucket. For less frequently access data we can move it to VTS (Virtual tape shelf).  
+
+Points to be noted:
+* Emulates a tape library
+* Data is stored in AWS (VTS and VTL)
+* Virtual Tape 100GB - 5TB
+----------------------------------------
+** QUIZ **
+
+* An EC2 instance requires temporary storage of data that changes frequently and is only needed during the instance lifecycle.Amazon instance store is used for this.
+* Amazon FSx for Lustre is optimized for high-performance computing (HPC), machine learning, and media data processing workflows, providing a high-performance file system used in compute-intensive environments.Also a fully managed native Microsoft Windows file system to provide shared file storage with the compatibility and features of Windows Server.
+* A company wants to analyze their S3 object access patterns to determine when to transition objects to less expensive storage classes.Storage class analysis can be used.
+* A data engineer needs to upload large files over a high-latency network to S3. Which method should they use to maximize the upload efficiency? S3 multipart upload
+* Which EC2 instance type provides direct-attached Instance Store volumes that are ideal for high random I/O performance and low-latency workloads? Storage-optimized instances
+* A database administrator is deploying a high-performance OLTP database system on AWS. Which Amazon EBS volume type should they choose to ensure consistent I/O performance and low latency? provisioned IOPS SSD (io2)
+* An organization wants to enforce that all objects uploaded to their S3 bucket are encrypted at rest. Which method can they use to achieve this? use s3 bucket policy to deny uploads that are not encrypted.
+* S3 Lifecycle Policies can automate the transition of objects to a cheaper storage class after a certain period and define rules for automatic deletion after a specified time.
+* AWS Elastic Disaster Recovery minimizes downtime and data loss with fast, reliable recovery of physical, virtual, and cloud-based servers into AWS
+* S3 Access Control Lists (ACLs) can grant read and write permissions to a single user on specific S3 objects, allowing for fine-grained access control. Use Bucket Policies for Complex Scenarios where as Use ACLs for Simple Access Control.
+* A developer wants to trigger a Lambda function for processing images each time a new image is uploaded to their S3 bucket. Which feature should they configure to achieve this? S3 event notification
+* A web development company wants to improve the upload speed to their S3 bucket for global users. Which feature should they enable on their S3 bucket? S3 transfer acceleration
+* Amazon FSx for NetApp ONTAP offers full compatibility with NetApp management tools and features, allowing for easy migration of on-premises NetApp file storage to AWS.
+* An organization is looking for a way to save on storage costs for objects with unknown or changing access patterns. Which S3 storage class automatically moves objects between two access tiers based on changing access patterns? S3 intelligent tiering
+* A company wants to connect an on-premises software application with cloud-based storage to provide secure and scalable storage infrastructure. Which hybrid cloud storage service should they implement? Amazon storage gateway
+* A multinational company requires their S3 data to be replicated across regions for lower-latency access and compliance with data sovereignty requirements. Which S3 feature should they implement? S3 cross region replication (CRR)
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+**** Services: Compute
+
+EC2:
+When we create a application, we need it to be deployed on a server. It should be able to handle all the client request and handle responses. 
+The term server comes from a client server architecture. where client send request to server and and get the response back. In webserver, the web browser will go to ip address or the domain name of specific website which will get routed to the server and server will serve the html file that represents the website by sending that back as a response. Once we deploy our app into a server, the end users.clients will send request to our server and they will get the response of data that they are ultimately looking for. The end users can be web browser or mobile application and they will send request to our server.
+Aws allows us to rent the server in the cloud i.e EC2 instance.
+
+Different EC2 instance types are 
+* General purpose (webservers and other traditional apps)
+* Compute optimized (when we need heigher CPU)
+* Memory optimized (fast performances of workloads) (heigher RAM)
+* Storage optimized (for High IO operations applications for more read and write performances)
+* GPU instances (for machine learning,Deep learning which needs extra GPU)
+
+Amazon Machine Image (AMI):
+When we deploy a server,we need to install a OS. We utilize AMIs which tell what type of OS is installed on server like ubuntu,amazon linux etc. We can also customize AMIs like we can tell that we need webserver on top of OS when we launch the instance.Also we can get softwares and dependency files with AMIs. Then with one AMI, we can create as many instance as we want. All will be identical.
+
+Types of AMI:
+* Public AMI (publically accessible),
+* private AMI (only owners of the AMI can access it)
+* Shared AMIs (can be shared across different organizations or accounts)
+
+If we have a ec2 instance and we have made our own changes, we can create our own  AMIs. 
+One instance is created , we can login to it using SSH. we need to also specify keypair. Public Key and private key. Public key is already created in instance. We can use private key to login to EC2 instance securely. This will encrypt the login information.
+
+EC2 instance life cycle:
+When we first launch EC2 instance, it will be in pending --> Running --> Stopped --> starting --> shutting Down --> terminated
+
+* User data:
+At the time of launching EC2 instance, we can pass user data into it. it contains shell script,download any files necessary to download, any pre configurations,install software.
+We should also create security group for our instance.
+
+* EC2 with EBS:
+Scalable block storage ,persistent storage to store data. also we get snapshots. They are incremental.
+
+* Ec2 instances can also integrate with two other services like ELB and ASG. If we deploy our applications across multiple instance and even across multiple AZ, the load balancer will balance load across them. Autoscaling group allows us to automatically adjust the number of instances within the group.
+
+* EC2 with ElasticIPs. We can associate one elastic IP with one instance and then dettach it and again attach it to other instance. 
+
+* EC2 launch template - If we want our EC2 to be deployed with specific AMIs and specific configuration, we can use this. Auto scaling group needs to know what configuration need to be created for the newly launched instance, then it can make use of launch template.
+
+* EC2 instance placements:
+When we create a EC2 instance, it can be deployed in any server in a data center or even across any AZ. Here we can give AWS some configuration to tell that we want our EC2 to be placed in specific location depending on what type of application you have. 
+1. cluster placement group : will place our EC2 instances as close to each other as possible (In same rack AZ). Suitable for app which needs low network latency, high network throughput where we need high performance computing applications like big data snd analytics for workloads.
+2. Partition placement group: This spreads instances across logical partitions which ensures that instances in one partition do not share the underlying hardware with instances in other partitions. Suitable for distributed replicated or hadoop based workloads. Each rack will have is own network and power source. Partitions wont be in same hardware.
+3. Spread placement group: This spreads out our instances across distinct underlying hardware to reduce core related failures. This is ideal for small number of critical instances that should be kept seperate from each other. In this it ensures that each instance is placed on distinct rack and each rack will have its own network and power source.
+
+EC2 instance purchasing option:
+On demand, Spot,Saving plans,reserved instances,dedicated hosts,dedicated instances.
+* On demand: allows us to pay for the compute capacity by the hour or the second with no long time commitments or no upfront payments. Suitable for short term or irregular work loads that cannot be interupted. Benifits are you get flexibility  like increased/decreased capacity 
+* Spot instances: It allows you to bid on unused ec2 instances on discount.They are available upto 90% discount compared to on demand instances. We will be not sure when we will get spot instances. It can go away whenever and it is unpredictable. It can be used for batch processing that can run whenever it needs to run.
+* savings plan:  Commit to spend a specific amount of EC2 compute capacity for a 1-year or 3-year term in exchange for a lower hourly rate. Savings Plans provide flexibility by allowing you to switch instance types and regions.
+Cost: Generally more cost-effective than On-Demand, especially if you commit to a consistent level of usage.
+* Reserved Instance: (commiting to use)
+Reserve a specific instance type in a specific region for a 1-year or 3-year term. Reserved Instances provide significant discounts over On-Demand pricing. There are three payment options: All Upfront, Partial Upfront, and No Upfront.
+Cost: Less expensive than On-Demand, with cost savings increasing based on the payment option and term length.
+* Dedicated host: 
+Purchase physical servers dedicated to your use. Dedicated Hosts allow you to use your own software licenses and meet specific compliance requirements. We always get the same exact host with the same exact serial number even if we stop and start the instances.
+Cost: Typically more expensive than other options due to the dedicated nature of the hardware and associated management costs. 
+* Dedicated Instance:
+Instances run on hardware that is dedicated to your use, but you don’t have control over the underlying host. Dedicated Instances do not share hardware with other AWS accounts. The hosts on which our ec2 instances are can change.If we shut our EC2 instances,and again start them, they can move to another physical host. The host (physical server) is reserved exclusivly for us. but which specific host can change over time.
+Cost: More expensive than standard On-Demand instances due to the dedicated nature of the hardware.
+---------------------------------
+Demo: EC2
+
+Go to EC2 --> instances --> launch --> give name,choose ami,choose keypair,choose vpc subnet,choose volume,create security group --> create instance "ec2-demo-instance"
+Note that ami id will change based on region.
+ssh into the instance
+--> ssh -i <pem-file.pem> ec2-user@<public-ip of instance>
+Terminate the instance
+---------------------------------
+EC2 image Builder
+
+
