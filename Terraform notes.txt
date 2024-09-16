@@ -2845,14 +2845,14 @@ terraform {
     }
   }
 } 
-Also remove the version constraints in the provider and also delete the terraform.hcl.lock file.
+Also remove the version constraints in the provider and also delete the terraform.lock.hcl file.
 --> terraform init       (o/p: latest version of aws provider is downloaded)
 --> terraform apply -auto-approve
 (o/p: we will get depricated error for vpc = true)
 for this we need to go to official documentation of aws_eip of terraform and we can see it is domain = "vpc" for newer version of terraform. Replace it .
 --> terraform apply -auto-approve
 (our eip is created with latest version of terraform. you can verify it in the AWS console also)
--->
+
 ------------------------------------------------------------------------------------
 Terraform challenge 2:
 This challenge is based on Terraform best practice related to variables. The sample code has been provided which creates certain AWS resources. And we are suppose to optimize code following best practices.
@@ -2921,7 +2921,7 @@ TF Challenge 2 - Solution hints:
 
 * Indentation issues are present in the code. Make sure the code is properly indented.
 * Many values are hardcoaded as part of code. This makes difficult to modify if code base becomes larger. We need to make use of variables and TFVars.
-* Using tags: It is important taht resources are properly tagged. This will make it easier to identify the resource among all others.
+* Using tags: It is important that resources are properly tagged. This will make it easier to identify the resource among all others.
 In AWS security group console, we can see lot of security groups. It is very important practice to tag each security group with specific information so that it becomes useful for us in future for reference.
 * Variable Precedence: Consider using appropriate variable precedence to override variables from Terraform code.
 * Right Folder Structure: having right naming convention for files is important.
@@ -3030,7 +3030,7 @@ All resources are created and you can verify it in aws console
 
 We can also cut short the local name as payment_app. we can also add description tag in order to get more details of our resources created. 
 description = "<your text>"
-And finally to follow the right file structure, move all the configuration in tf-challenge-2 file to appropriate files like providers.tf,sg.t,eip.tf
+And finally to follow the right file structure, move all the configuration in tf-challenge-2 file to appropriate files like providers.tf,sg.tf,eip.tf
 --> terraform apply -var "splunk=8089" -auto-approve
 (o/p: No changes )
 So as long as the resource block remains to be same, even if you move the resource block across multiple different files in the same folder, there will be no changes.
@@ -3064,7 +3064,7 @@ provider "aws" {
 }
 
 Conditions to meet:
-1) Based on the values specified in map,EC2 instances should be creatd accordingly.
+1) Based on the values specified in map,EC2 instances should be created accordingly.
 2) If key/value is removed from map, EC2 instance should be destroyed accordingly.
 
 i.e if there are 20 instances defined in the map, 20 instances should be created accordingly based on the configurations specified in the map.
@@ -3115,7 +3115,7 @@ you need to make use of Terraform Function that can calculate total number of us
 TF Challenge 4 - Solution:
 
 search for terraform aws provider. And in that ,in the leftside ham burger menu,we can see for ecr service we have Resources option and Data Source option.
-Forthe requirement-2,we want to fetch im users informations from aws account.
+For the requirement-2,we want to fetch iam users informations from aws account.
 Now in the iam service --> Data Sources --> aws_iam_users, and get the code and create main.tf,and add below
 data "aws_iam_users" "users" {}
 
@@ -3169,7 +3169,7 @@ Eg: Q: Demo software stores information in which type of backend?
 A: .................
 
 Important rules to be followed:
-be alone in room,desk and work area are clear,you are connected to a power source,no phones or headphones,no dual monotors,no leaving your seat,no talking,webcam speakers and microphone must remain on throughout the test,the proctpr must be able to see you for the duration of the test.
+be alone in room,desk and work area are clear,you are connected to a power source,no phones or headphones,no dual monitors,no leaving your seat,no talking,webcam speakers and microphone must remain on throughout the test,the procter must be able to see you for the duration of the test.
 
 Registration process:
 1. Login to the HashiCorp Certification Page.
@@ -3182,7 +3182,7 @@ Go to "hashicorp.com/certification" page --> click on Hashicorp Infrastructure A
 Next you come to payment section where we need to add the credit card information & Ensure that billing address will exactly match the statement in our card (very important) --> Pay and register
 Once we are registered, we get Email from the PSI giving important details of exams. Also in that mail, We need to verify the compatibility check by click on the link and it will take you to one syscheck.bridge.psiexams.com --> Run system check --> It will ask us to share the screen and it will verify the audio level of our microphone --> Download the PSI secure browser --> agree terms and condition and install it --> open that software and select your camera & microphone (use the default one that comes with laptop) --> Next --> Photo ID capture --> show PAN card or open PAN card from your mobile and show it to camera --> take a snap of it --> continue --> Scan your room and workspace --> We need to scan our camera 360 degree and show our entire workspace --> Click on start recording --> If we dont have external webcam, we need to hold our laptop in hand and rotate 360 degree --> Play the recording --> continue --> take a selfie --> continue --> you are all set
 
-NOTE: make sure you are Firewall is not blocking the PSI secure browser software (Turn off if possible) --> check video and audio protection in your firewall.
+NOTE: make sure your Firewall is not blocking the PSI secure browser software (Turn off if possible) --> check video and audio protection in your firewall.
 
 On the Day of exam Please login 15 min earlier and launch your exam. 
 After we Register for the exam, We can see our exam date,time informations.
