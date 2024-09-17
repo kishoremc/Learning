@@ -1345,4 +1345,65 @@ Terminate the instance
 ---------------------------------
 EC2 image Builder
 
+It is a service that allows to automate the creation, management and deployment of custom AMIs. We can use console,CLI or APIs to create custom images for our AWS account. 
+Organizations can have golden image. Golden image is a master image that is pre configured, fully provisioned and optimized and it contains all of the organization settings,configurations etc that the organization expects.
+To create the image, first we need to select the base image and we will go with build --> customize --> test --> Distribute
+In Build phase, the pre existing AMI is taken --> Add to or remove software from your base image --> customize settings and scripts with build components --> TEST: test customized image --> DISTRIBUTE: Distribute AMIs to AWS regions and AWS accounts --> RUN: create instances from custom image. 
 
+EC2 Image builder Pipeline: 
+We can automate all those steps using pipeline. In the EC2 Image Builder, First we will specify Image Recipe with source Image and Build components --> Infrastructure configuration (It deployes the EC2 instance, customizes it and makes the image out of it) (we can configure network,VPC,subnet etc) --> Distribution config (to specify the region to deploy, the Accounts to share image with) --> Golden image
+
+Features:
+1. Automated Image creation
+2. Golden Image creation
+3. Simpler to Secure
+4. Consistent Workflow
+5. Version Management
+---------------------------------------------
+Elastic Network Interface (ENI):
+
+It is a virtual network interface that can be attached to EC2 instance in a VPC. It is kind of seperating network interface from EC2 instances. We can take all network configuration and assign it to EC2 instance or move it to another instance. 
+ENI include all the properties that the actual network interface have. It has primary Pvt IPv4 address, secondary IPv4 addresses,elastic IP address associated with it,Public IP addresses etc. 
+
+ENI: Primary vs Secondary ENI
+When we launch the EC2 instance, it is automatically equiped with primary ENI "eth0". This ENI is automatically assigned with primary pvt IPV4 address. And this IP address exists untill the ENI is deleted. The primary ENI cannot be detached from the Running or stopped instance. It is automatically deleted when the instance is stopped. If the Instance is configured with auto assign public IP, the primary ENI will also receive public IP as well.
+We can attach the additional ENIs to EC2 instances which are often referred to as Secondary ENIs "eth1". Secondary ENIs are usefull for network appliances, management networks or to create a low budget high availability solution. Secondary ENIs can have one primary private IP address and multiple secondary pvt IP address. Unlike Primary ENIs, the secondary ENIs can be attached or detached from an instance offering flexibility in network configurations. Also Secondary ENIs can be associated with different security groups. 
+We can attach multiple Secondary ENIs with EC2 instance and they exist even if the instance is stopped or restarted. 
+If we want a static IP address with ENI,then we can associate EIP with it.With this even when the ENI gets detached or re attached to instance, the elastic IP will be always associated with tht ENI. On top of it we can associate one or more security groups which acts like fire wall. 
+
+Features:
+1. Multiple IP address
+2. Elastic IP addresses
+3. Security
+4. Hot attach and detach
+5. Flow logs
+-------------------------------------
+Demo: ENI
+Lets create a seperate AWS object which is seperated from EC2. Then we can take this network interface and bind it to EC2 instance. Goto EC2 --> Network interfaces (in left ham burger menu) --> Description:my-ec2-interface --> choose one public subnet --> Auto-assign pvt IP --> choose Security group --> create Network interface
+Select network interface --> Actions --> Attach --> choose your EC2 instance --> Attach (optional)
+Also select your NI and we can Actions drop down --> Associate address --> choose your Elastic IP --> Associate (optional)
+Create a EC2 instance --> in the network section ,instead of choosing the VPC,Subnet etc here, go to advance network configuration --> Network interface and we can see one new network interface is attached by default. We can change and choose the NI which we created. (note that we need to chooze existing sg). If we want ,we can add one more NI --> create instance
+Once the instance is created, go to network tab and we can see the network interface with a private IP. 
+We can assign more than one NI to the EC2 instance. Go to NI and again one more NI (nic-2).select it and drop down and actions --> associate a elastic IP.
+Now go back to EC2 instance and select it and actions --> networking --> attch network interface -->  choose nic-2 --> Attach
+NOTE: We can attach NI even when the instance is running. And in Instances, we always see private instances. AWS will do some network translation and will not let know the Public Ip to its own instance.
+We can also SSH into IP address. --> ip add (this will list all NI on our EC2 instances.)
+We also can detach the NI by selecting the Instance -> actions -> Network interface -> detach NI . And if we want we can attach it to another instance also. So like this if we are doing any maintanence on any server, we can move the nic to another server. Like this we can seperate our EC2 instances from Network configurations.
+----------------------------------
+AWS Elastic Beanstalk:
+
+Elastic Beanstalk was created so that we can quickly deploy and manage Aplications in AWS cloud without needing to learn all other services that runs the applications. Elastic beanstalk will provision all of the services we need.We provide the different settings we want,we uplod the application code and beanstalk will create all of the VPC,Subnets,Instances,S3logs,Database,loadbalancer,Asg etc
+
+create web applications --> upload web application --> configure elastic Beanstalk --> Deploy web application
+Environment: It is the collection of all of the AWS resources that are necessary for your application to run. (eg. Dev,stage,production env etc) so that we can upload all our code in one env ,test it and then deploy the production environment.
+Supported platforms are docker,.net,java,go,ruby,python,nodejs,php etc
+In Beanstalk, we deploy new versions of applications.  
+ 
+Features of Beanstalk are:
+1. Easy deployment
+2. Managed platform updates
+3. Autoscaling and loadbalancing
+4. Monitoring and Health
+5. Pre configured components.
+-----------------------------------------
+Demo: Elastic Beanstalk
